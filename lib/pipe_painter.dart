@@ -33,7 +33,9 @@ class PipePainter extends CustomPainter {
       final to = _findNode(pipe.toNodeId);
       if (from == null || to == null) continue;
 
-      final points = <Offset>[from.outputPort, ...pipe.waypoints, to.inputPort];
+      final start = from.getPort(pipe.fromPortId, isInput: false);
+      final end = to.getPort(pipe.toPortId, isInput: true);
+      final points = <Offset>[start, ...pipe.waypoints, end];
       final isSelected = pipe.id == selectedPipeId;
 
       final path = Path()..moveTo(points.first.dx, points.first.dy);

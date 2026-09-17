@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// A high-fidelity centrifugal monoblock pump.
+/// A high-fidelity centrifugal monoblock pump — tuned to be more
+/// eye-catching than a plain industrial render.
 ///
-/// [isOn]  – running state: brighter casting, lit indicator, warm glow.
-/// [phase] – radians; spin the cooling fan / coupling by animating this.
+/// [isOn]  – running state: saturated casting color, pulsing lamp,
+///           breathing halo glow, and animated flow dots on the pipes.
+/// [phase] – radians; drives the fan/coupling spin AND the glow pulse.
 class DetailedPumpPainter extends CustomPainter {
   final bool isOn;
   final double phase;
@@ -12,15 +14,21 @@ class DetailedPumpPainter extends CustomPainter {
   DetailedPumpPainter({required this.isOn, this.phase = 0});
 
   // ---------------------------------------------------------------- palette
-  Color get _castLight => isOn ? const Color(0xFF7CC47F) : const Color(0xFF9FB08F);
-  Color get _castMid => isOn ? const Color(0xFF2F7D34) : const Color(0xFF5E6E45);
-  Color get _castDark => isOn ? const Color(0xFF12401A) : const Color(0xFF323C22);
-  Color get _castDeep => isOn ? const Color(0xFF0A2810) : const Color(0xFF1E2416);
+  // Punchier, more saturated than a realistic industrial grey-green so the
+  // machine reads clearly at a glance and the on/off states contrast hard.
+  Color get _castLight => isOn ? const Color(0xFF7CF29A) : const Color(0xFFB9C6B2);
+  Color get _castMid => isOn ? const Color(0xFF17B24E) : const Color(0xFF7C8A6E);
+  Color get _castDark => isOn ? const Color(0xFF0A6B2E) : const Color(0xFF4B5740);
+  Color get _castDeep => isOn ? const Color(0xFF033316) : const Color(0xFF262E1E);
 
-  static const Color _edge = Color(0xFF0B2410);
-  static const Color _steelLight = Color(0xFFE3E7EA);
-  static const Color _steelMid = Color(0xFF9AA4AB);
-  static const Color _steelDark = Color(0xFF4A5459);
+  // Warm accent used only while running, for the glow / lamp / flow dots.
+  static const Color _accentGlow = Color(0xFF4CFF8F);
+  static const Color _accentGlowSoft = Color(0x664CFF8F);
+
+  static const Color _edge = Color(0xFF06210E);
+  static const Color _steelLight = Color(0xFFEFF3F5);
+  static const Color _steelMid = Color(0xFFA7B2B9);
+  static const Color _steelDark = Color(0xFF454F55);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -28,6 +36,7 @@ class DetailedPumpPainter extends CustomPainter {
     final double h = size.height;
 
     _groundShadow(canvas, w, h);
+    if (isOn) _ambientHalo(canvas, w, h); // sits behind everything, breathes
     _basePlate(canvas, w, h);
     _feet(canvas, w, h);
     _motorBarrel(canvas, w, h);
@@ -37,7 +46,10 @@ class DetailedPumpPainter extends CustomPainter {
     _volute(canvas, w, h);
     _suction(canvas, w, h);
     _discharge(canvas, w, h);
-    if (isOn) _runningGlow(canvas, w, h);
+    if (isOn) {
+      _runningGlow(canvas, w, h);
+      _flowDots(canvas, w, h);
+    }
   }
 
   // ------------------------------------------------------------- primitives
@@ -86,6 +98,21 @@ class DetailedPumpPainter extends CustomPainter {
   }
 
   // ------------------------------------------------------------------ parts
+
+  /// A soft, slowly "breathing" halo behind the whole unit while it runs.
+  /// This is the single biggest lever for making the on-state noticeable —
+  /// it changes brightness/size continuously instead of being a static glow.
+  void _ambientHalo(Canvas canvas, double w, double h) {
+    final double breathe = 0.55 + 0.45 * (0.5 + 0.5 * math.sin(phase));
+    final Offset c = Offset(w * 0.55, h * 0.5);
+    canvas.drawCircle(
+      c,
+      w * (0.46 + 0.04 * breathe),
+      Paint()
+        ..color = _accentGlowSoft.withOpacity(0.28 * breathe)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.09),
+    );
+  }
 
   void _groundShadow(Canvas canvas, double w, double h) {
     canvas.drawOval(
@@ -231,9 +258,7 @@ class DetailedPumpPainter extends CustomPainter {
     // Recessed opening — kept dark so the pale blades pop against it.
     canvas.drawCircle(c, r * 0.78, Paint()..color = const Color(0xFF060A08));
 
-    // Blades turning inside it. Each blade is drawn wider and lighter than
-    // before, with its own highlight/shadow edge so they read as distinct
-    // plastic vanes rather than a grey blur.
+    // Blades turning inside it.
     canvas.save();
     canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: r * 0.78)));
     // Faint hub disc behind the blades so the centre doesn't look empty.
@@ -267,8 +292,7 @@ class DetailedPumpPainter extends CustomPainter {
       );
     }
     canvas.restore();
-    // Directional shading so the whole blade pack reads as a shallow cone,
-    // brighter where the light hits, dim on the far side.
+    // Directional shading so the whole blade pack reads as a shallow cone.
     canvas.drawCircle(
       c,
       r * 0.78,
@@ -332,17 +356,20 @@ class DetailedPumpPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..color = const Color(0xFF14181B));
 
-    // Status lamp.
+    // Status lamp — now with a much bigger, pulsing halo so the running
+    // state is unmistakable even at a glance or in a small thumbnail.
     final Offset lamp = Offset(w * 0.545, h * 0.196);
-    final double lr = h * 0.016;
+    final double lr = h * 0.018;
     if (isOn) {
-      canvas.drawCircle(lamp, lr * 3.2, _softShadowColour(const Color(0xFF5CE08A), 0.45, h * 0.018));
+      final double pulse = 0.6 + 0.4 * (0.5 + 0.5 * math.sin(phase * 2));
+      canvas.drawCircle(lamp, lr * (4.5 + 1.5 * pulse), _softShadowColour(_accentGlow, 0.20 * pulse, h * 0.02));
+      canvas.drawCircle(lamp, lr * (2.6 + 0.6 * pulse), _softShadowColour(_accentGlow, 0.45 * pulse, h * 0.012));
     }
     canvas.drawCircle(lamp, lr, Paint()
       ..shader = RadialGradient(
         center: const Alignment(-0.4, -0.4),
         colors: isOn
-            ? const [Color(0xFFD7FFE4), Color(0xFF3ED06F), Color(0xFF125A2C)]
+            ? const [Color(0xFFEBFFF1), Color(0xFF35FF7F), Color(0xFF0B7A34)]
             : const [Color(0xFF6E7A70), Color(0xFF3A423C), Color(0xFF1B211D)],
       ).createShader(Rect.fromCircle(center: lamp, radius: lr)));
     canvas.drawCircle(lamp, lr, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.9..color = const Color(0xFF0D1114));
@@ -424,10 +451,11 @@ class DetailedPumpPainter extends CustomPainter {
     canvas.drawCircle(plug, h * 0.018, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _edge);
   }
 
-  /// Blue pipework shared by suction and discharge.
+  /// Bright, saturated pipework shared by suction and discharge — bumped
+  /// from a muted blue to an electric cyan so the plumbing reads instantly.
   Paint _pipe(Rect r, {bool horizontal = false}) => _fill(
     r,
-    const [Color(0xFF0E4C77), Color(0xFF4FC3F7), Color(0xFF0288D1), Color(0xFF01395E)],
+    const [Color(0xFF0D5C8C), Color(0xFF5CDBFF), Color(0xFF00A3E0), Color(0xFF014870)],
     stops: const [0.0, 0.22, 0.62, 1.0],
     begin: horizontal ? Alignment.topCenter : Alignment.centerLeft,
     end: horizontal ? Alignment.bottomCenter : Alignment.centerRight,
@@ -476,7 +504,10 @@ class DetailedPumpPainter extends CustomPainter {
     canvas.drawRect(riser, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.9..color = const Color(0xFF01395E));
   }
 
+  /// Outline glow hugging the motor — stronger and warmer-colored than the
+  /// original so it's obviously "lit up" rather than a faint tint.
   void _runningGlow(Canvas canvas, double w, double h) {
+    final double pulse = 0.7 + 0.3 * (0.5 + 0.5 * math.sin(phase));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTRB(w * 0.44, h * 0.28, w * 0.86, h * 0.77),
@@ -484,17 +515,48 @@ class DetailedPumpPainter extends CustomPainter {
       ),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = h * 0.02
-        ..color = const Color(0x3357E08A)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.025),
+        ..strokeWidth = h * 0.028
+        ..color = _accentGlow.withOpacity(0.35 * pulse)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.03),
     );
+  }
+
+  /// Small bright dots animated along the suction/discharge pipes, giving a
+  /// clear "liquid is flowing" cue that draws the eye — the biggest visual
+  /// difference between a static illustration and one that feels alive.
+  void _flowDots(Canvas canvas, double w, double h) {
+    final Paint dot = Paint()..color = Colors.white.withOpacity(0.9);
+    final Paint dotGlow = Paint()
+      ..color = Colors.white.withOpacity(0.5)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.01);
+
+    // Discharge riser: dots travel upward.
+    for (int i = 0; i < 3; i++) {
+      final double t = ((phase / (2 * math.pi)) + i / 3) % 1.0;
+      final double y = h * 0.098 - t * (h * 0.068);
+      final Offset p = Offset(w * 0.255, y);
+      canvas.drawCircle(p, h * 0.010, dotGlow);
+      canvas.drawCircle(p, h * 0.006, dot);
+    }
+
+    // Suction pipe: dots travel rightward, toward the volute.
+    for (int i = 0; i < 3; i++) {
+      final double t = ((phase / (2 * math.pi)) + i / 3) % 1.0;
+      final double x = t * (w * 0.075);
+      final Offset p = Offset(x, h * 0.525);
+      canvas.drawCircle(p, h * 0.010, dotGlow);
+      canvas.drawCircle(p, h * 0.006, dot);
+    }
   }
 
   @override
   bool shouldRepaint(covariant DetailedPumpPainter old) => old.isOn != isOn || old.phase != phase;
 }
 
-/// Drop-in widget: keeps the fan spinning while the pump is running.
+/// Drop-in widget: keeps the fan spinning (and the glow breathing/flow dots
+/// moving) while the pump is running. Also gives the whole unit a small
+/// "pop" scale animation when it switches on, which is a cheap but very
+/// effective way to draw the user's attention to the state change.
 class PumpView extends StatefulWidget {
   final bool isOn;
   final Size size;
@@ -529,11 +591,18 @@ class _PumpViewState extends State<PumpView> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, __) => CustomPaint(
-        size: widget.size,
-        painter: DetailedPumpPainter(isOn: widget.isOn, phase: _c.value * 2 * math.pi),
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(widget.isOn),
+      tween: Tween(begin: widget.isOn ? 0.94 : 1.0, end: 1.0),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => CustomPaint(
+          size: widget.size,
+          painter: DetailedPumpPainter(isOn: widget.isOn, phase: _c.value * 2 * math.pi),
+        ),
       ),
     );
   }

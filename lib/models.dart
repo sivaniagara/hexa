@@ -29,6 +29,9 @@ class PumpNode {
     if (type == NodeType.pump) {
       return Offset(position.dx, position.dy + size.height * 0.525);
     }
+    if (type == NodeType.sump) {
+      return Offset(position.dx, position.dy + size.height * 0.2);
+    }
     return Offset(position.dx, position.dy + size.height / 2);
   }
 
@@ -38,7 +41,24 @@ class PumpNode {
     if (type == NodeType.pump) {
       return Offset(position.dx + size.width * 0.255, position.dy + size.height * 0.030);
     }
+    if (type == NodeType.sump) {
+      return Offset(position.dx + size.width * 0.79, position.dy);
+    }
     return Offset(position.dx + size.width, position.dy + size.height / 2);
+  }
+
+  /// Returns the specific port location by ID, or falls back to default
+  /// input/output ports if ID is null or unknown.
+  Offset getPort(String? portId, {required bool isInput}) {
+    if (type == NodeType.pump) {
+      if (portId == 'input' || (portId == null && isInput)) return inputPort;
+      if (portId == 'output' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.sump) {
+      if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
+      if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
+    }
+    return isInput ? inputPort : outputPort;
   }
 
   Offset get center =>
@@ -76,12 +96,18 @@ class PipeConnection {
   List<Offset> waypoints;
   bool flowActive;
 
+  // Added port identifiers to allow connecting to specific ports (e.g. suction vs discharge on a pump)
+  String? fromPortId;
+  String? toPortId;
+
   PipeConnection({
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
     List<Offset>? waypoints,
     this.flowActive = true,
+    this.fromPortId,
+    this.toPortId,
   }) : waypoints = waypoints ?? <Offset>[];
 
   Map<String, dynamic> toJson() => {
@@ -89,6 +115,8 @@ class PipeConnection {
         'from': fromNodeId,
         'to': toNodeId,
         'flowActive': flowActive,
+        'fromPortId': fromPortId,
+        'toPortId': toPortId,
         'waypoints':
             waypoints.map((w) => {'dx': w.dx, 'dy': w.dy}).toList(growable: false),
       };
@@ -98,6 +126,8 @@ class PipeConnection {
         fromNodeId: j['from'] as String,
         toNodeId: j['to'] as String,
         flowActive: j['flowActive'] as bool? ?? true,
+        fromPortId: j['fromPortId'] as String?,
+        toPortId: j['toPortId'] as String?,
         waypoints: (j['waypoints'] as List)
             .map((w) => Offset(
                 ((w as Map)['dx'] as num).toDouble(), (w['dy'] as num).toDouble()))

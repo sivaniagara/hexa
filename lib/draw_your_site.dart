@@ -11,14 +11,14 @@ const double kCanvasWidth = 1900;
 const double kCanvasHeight = 1150;
 const double kPipeHitTolerance = 14;
 
-class PumpConfigScreen extends StatefulWidget {
-  const PumpConfigScreen({super.key});
+class DrawYourSiteScreen extends StatefulWidget {
+  const DrawYourSiteScreen({super.key});
 
   @override
-  State<PumpConfigScreen> createState() => _PumpConfigScreenState();
+  State<DrawYourSiteScreen> createState() => _DrawYourSiteScreenState();
 }
 
-class _PumpConfigScreenState extends State<PumpConfigScreen> {
+class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
   final List<PumpNode> _nodes = [];
   final List<PipeConnection> _pipes = [];
 
@@ -419,7 +419,9 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
       final from = _findNode(pipe.fromNodeId);
       final to = _findNode(pipe.toNodeId);
       if (from == null || to == null) continue;
-      final points = <Offset>[from.outputPort, ...pipe.waypoints, to.inputPort];
+      final start = from.getPort(pipe.fromPortId, isInput: false);
+      final end = to.getPort(pipe.toPortId, isInput: true);
+      final points = <Offset>[start, ...pipe.waypoints, end];
       for (int i = 0; i < points.length - 1; i++) {
         final d = distanceToSegment(pos, points[i], points[i + 1]);
         if (d < bestDist) {
@@ -561,8 +563,38 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
 
     // Check if dropped on a node
     String? targetNodeId;
+    String? targetPortId;
     for (final node in _nodes) {
       if (node.id == _connectFromId) continue;
+      
+      // Check if dropped near a specific port of a pump
+      if (node.type == NodeType.pump) {
+        if ((node.inputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'input';
+          break;
+        }
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'output';
+          break;
+        }
+      }
+
+      // Check if dropped near a specific port of a sump
+      if (node.type == NodeType.sump) {
+        if ((node.inputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'inlet';
+          break;
+        }
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'outlet';
+          break;
+        }
+      }
+
       final rect = Rect.fromLTWH(node.position.dx, node.position.dy, node.size.width, node.size.height);
       if (rect.contains(pos)) {
         targetNodeId = node.id;
@@ -575,7 +607,9 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
         final newPipe = PipeConnection(
           id: _nextId('pipe'),
           fromNodeId: _pendingDragIsInput ? targetNodeId! : _connectFromId!,
+          fromPortId: _pendingDragIsInput ? targetPortId : (_pendingDragIsInput ? null : 'output'),
           toNodeId: _pendingDragIsInput ? _connectFromId! : targetNodeId!,
+          toPortId: _pendingDragIsInput ? 'input' : targetPortId,
         );
         _pipes.add(newPipe);
       });
@@ -652,7 +686,7 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pumping System Configuration'),
+        title: const Text('Draw Your Site'),
         actions: [
           IconButton(
             tooltip: 'Zoom out',
@@ -745,6 +779,17 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
                                   ),
                                 ),
                               ),
+                              // nodes
+                              for (final node in _nodes)
+                                NodeWidget(
+                                  node: node,
+                                  isSelected: node.id == _selectedNodeId,
+                                  isConnectSource: node.id == _connectFromId,
+                                  onTap: () => _onNodeTap(node),
+                                  onLongPress: () => _onNodeLongPress(node),
+                                  onPanStart: (d) => _saveToHistory(),
+                                  onPanUpdate: (d) => _onNodePanUpdate(node, d),
+                                ),
                               // waypoint drag handles
                               for (final pipe in _pipes)
                                 for (int i = 0; i < pipe.waypoints.length; i++)
@@ -779,17 +824,27 @@ class _PumpConfigScreenState extends State<PumpConfigScreen> {
                                     color: Colors.lightBlue.withOpacity(0.7),
                                   ),
                                 ],
-                              // nodes
                               for (final node in _nodes)
-                                NodeWidget(
-                                  node: node,
-                                  isSelected: node.id == _selectedNodeId,
-                                  isConnectSource: node.id == _connectFromId,
-                                  onTap: () => _onNodeTap(node),
-                                  onLongPress: () => _onNodeLongPress(node),
-                                  onPanStart: (d) => _saveToHistory(),
-                                  onPanUpdate: (d) => _onNodePanUpdate(node, d),
-                                ),
+                                if (node.type == NodeType.sump) ...[
+                                  // Inlet port (Input)
+                                  WaypointHandle(
+                                    position: node.inputPort,
+                                    onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                    onPanUpdate: _onPortPanUpdate,
+                                    onPanEnd: _onPortPanEnd,
+                                    onLongPress: () {},
+                                    color: Colors.blueGrey.withOpacity(0.7),
+                                  ),
+                                  // Outlet port (Output)
+                                  WaypointHandle(
+                                    position: node.outputPort,
+                                    onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                    onPanUpdate: _onPortPanUpdate,
+                                    onPanEnd: _onPortPanEnd,
+                                    onLongPress: () {},
+                                    color: Colors.blue.withOpacity(0.7),
+                                  ),
+                                ],
                             ],
                           ),
                         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'pump_painter.dart';
+import 'sump_painter.dart';
 
 class NodeWidget extends StatelessWidget {
   final PumpNode node;
@@ -120,6 +121,36 @@ class NodeWidget extends StatelessWidget {
             child: CustomPaint(
               painter: DetailedPumpPainter(isOn: node.isOn),
             ),
+          ),
+        ),
+      );
+    }
+
+    if (node.type == NodeType.sump) {
+      return Positioned(
+        left: node.position.dx,
+        top: node.position.dy,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          child: Container(
+            width: node.size.width,
+            height: node.size.height,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isSelected || isConnectSource
+                  ? Border.all(
+                      color: isConnectSource ? Colors.orange : Colors.blue,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.all(4),
+            child: SumpView(isOn: node.isOn, size: node.size),
           ),
         ),
       );

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pump_config_screen.dart';
+import 'draw_your_site.dart';
 
 void main() {
   runApp(const PumpConfigApp());
@@ -11,13 +11,13 @@ class PumpConfigApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pump System Configurator',
+      title: 'Draw Your Site',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF1565C0),
         useMaterial3: true,
       ),
-      home: const PumpConfigScreen(),
+      home: const DrawYourSiteScreen(),
     );
   }
 }
