@@ -30,6 +30,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
   bool _pendingDragIsInput = false;
   double _scale = 1.0;
   int _idCounter = 0;
+  bool _globalHideJoints = false;
 
   bool _isShiftPressed = false;
 
@@ -143,10 +144,10 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
 
     final overheadTank = addNode(
         NodeType.tank, 'Overhead Tank', 760, 40,
-        size: const Size(120, 130));
+        size: const Size(110, 130));
     final intermediateTank = addNode(
         NodeType.tank, 'Intermediate Tank', 760, 330,
-        size: const Size(120, 130));
+        size: const Size(110, 130));
 
     final pumpT1 = addNode(NodeType.pump, 'Transfer\nPump T1', 520, 340);
     final pumpT2 = addNode(NodeType.pump, 'Transfer\nPump T2', 520, 460);
@@ -154,7 +155,8 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
     final dist1 = addNode(NodeType.distribution, 'Distribution\n(Irrigation)', 1080, 60);
     final dist2 = addNode(NodeType.distribution, 'Distribution\n(Users)', 1080, 340);
 
-    final sump = addNode(NodeType.sump, 'Sump /\nCollection Tank', 40, 760);
+    final sump = addNode(NodeType.sump, 'Sump /\nCollection Tank', 40, 760,
+        size: const Size(130, 90));
     final pumpE1 = addNode(NodeType.pump, 'Extraction\nPump E1', 260, 720);
     final pumpE2 = addNode(NodeType.pump, 'Extraction\nPump E2', 260, 840);
     final otherTank = addNode(NodeType.source, 'Other Source\n/ Drain', 500, 780);
@@ -187,12 +189,21 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
     _saveToHistory();
     final rnd = Random();
     final id = _nextId(type.name);
+    Size size = const Size(96, 74);
+    if (type == NodeType.tank || type == NodeType.overheadTank) {
+      size = const Size(110, 130);
+    } else if (type == NodeType.sump || type == NodeType.naturalSource || type == NodeType.well) {
+      size = const Size(130, 90);
+    }
+
     setState(() {
       _nodes.add(PumpNode(
         id: id,
         position: Offset(300 + rnd.nextInt(200).toDouble(), 550 + rnd.nextInt(150).toDouble()),
         type: type,
+        size: size,
         label: _defaultLabelFor(type),
+        showJoints: !_globalHideJoints,
       ));
       _selectedNodeId = id;
       _selectedPipeId = null;
@@ -213,6 +224,12 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         return 'Distribution';
       case NodeType.junction:
         return '';
+      case NodeType.well:
+        return 'Open Well';
+      case NodeType.overheadTank:
+        return 'Overhead Tank';
+      case NodeType.naturalSource:
+        return 'Natural Source';
     }
   }
 
@@ -287,17 +304,35 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                 controller: controller,
                 decoration: const InputDecoration(labelText: 'Label', border: OutlineInputBorder()),
               ),
-              if (node.type == NodeType.pump) ...[
+              if (node.type == NodeType.pump ||
+                  node.type == NodeType.sump ||
+                  node.type == NodeType.well ||
+                  node.type == NodeType.overheadTank ||
+                  node.type == NodeType.naturalSource) ...[
                 const SizedBox(height: 8),
                 StatefulBuilder(
-                  builder: (ctx, setSheetState) => SwitchListTile(
-                    title: const Text('Pump running'),
-                    value: node.isOn,
-                    onChanged: (v) {
-                      _saveToHistory();
-                      setSheetState(() => node.isOn = v);
-                      setState(() {});
-                    },
+                  builder: (ctx, setSheetState) => Column(
+                    children: [
+                      SwitchListTile(
+                        title: Text(node.type == NodeType.pump ? 'Pump running' : 'Active / Flowing'),
+                        value: node.isOn,
+                        onChanged: (v) {
+                          _saveToHistory();
+                          setSheetState(() => node.isOn = v);
+                          setState(() {});
+                        },
+                      ),
+                      SwitchListTile(
+                        title: const Text('Show joints / bolts'),
+                        subtitle: const Text('Hide flange bolts and assembly joints'),
+                        value: node.showJoints,
+                        onChanged: (v) {
+                          _saveToHistory();
+                          setSheetState(() => node.showJoints = v);
+                          setState(() {});
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -595,6 +630,38 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         }
       }
 
+      // Check if dropped near a specific port of an overhead tank
+      if (node.type == NodeType.overheadTank) {
+        if ((node.inputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'inlet';
+          break;
+        }
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'outlet';
+          break;
+        }
+      }
+
+      // Check if dropped near a specific port of a well
+      if (node.type == NodeType.well) {
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'suction';
+          break;
+        }
+      }
+
+      // Check if dropped near a specific port of a natural source
+      if (node.type == NodeType.naturalSource) {
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'intake';
+          break;
+        }
+      }
+
       final rect = Rect.fromLTWH(node.position.dx, node.position.dy, node.size.width, node.size.height);
       if (rect.contains(pos)) {
         targetNodeId = node.id;
@@ -715,6 +782,19 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
             onPressed: _showExportDialog,
           ),
           IconButton(
+            tooltip: _globalHideJoints ? 'Disable Hide Joints' : 'Enable Hide Joints',
+            icon: Icon(_globalHideJoints ? Icons.layers_clear : Icons.layers),
+            onPressed: () {
+              setState(() {
+                _globalHideJoints = !_globalHideJoints;
+                // Apply to all existing nodes
+                for (final node in _nodes) {
+                  node.showJoints = !_globalHideJoints;
+                }
+              });
+            },
+          ),
+          IconButton(
             tooltip: 'Reset to default layout',
             icon: const Icon(Icons.restart_alt),
             onPressed: () {
@@ -791,60 +871,111 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                   onPanUpdate: (d) => _onNodePanUpdate(node, d),
                                 ),
                               // waypoint drag handles
-                              for (final pipe in _pipes)
-                                for (int i = 0; i < pipe.waypoints.length; i++)
-                                  WaypointHandle(
-                                    position: pipe.waypoints[i],
-                                    onPanStart: (d) => _saveToHistory(),
-                                    onPanUpdate: (d) => _onWaypointPanUpdate(pipe, i, d),
-                                    onLongPress: () => _removeWaypoint(pipe, i),
-                                    color: pipe.id == _selectedPipeId
-                                        ? Colors.deepOrange
-                                        : const Color(0xFFFFA726),
-                                  ),
+                              if (!_globalHideJoints)
+                                for (final pipe in _pipes)
+                                  for (int i = 0; i < pipe.waypoints.length; i++)
+                                    WaypointHandle(
+                                      position: pipe.waypoints[i],
+                                      onPanStart: (d) => _saveToHistory(),
+                                      onPanUpdate: (d) => _onWaypointPanUpdate(pipe, i, d),
+                                      onLongPress: () => _removeWaypoint(pipe, i),
+                                      color: pipe.id == _selectedPipeId
+                                          ? Colors.deepOrange
+                                          : const Color(0xFFFFA726),
+                                    ),
                               // port handles for pumps
-                              for (final node in _nodes)
-                                if (node.type == NodeType.pump) ...[
-                                  // Discharge port (Output)
-                                  WaypointHandle(
-                                    position: node.outputPort,
-                                    onPanStart: (d) => _onPortPanStart(node, isInput: false),
-                                    onPanUpdate: _onPortPanUpdate,
-                                    onPanEnd: _onPortPanEnd,
-                                    onLongPress: () {},
-                                    color: Colors.blue.withOpacity(0.7),
-                                  ),
-                                  // Suction port (Input)
-                                  WaypointHandle(
-                                    position: node.inputPort,
-                                    onPanStart: (d) => _onPortPanStart(node, isInput: true),
-                                    onPanUpdate: _onPortPanUpdate,
-                                    onPanEnd: _onPortPanEnd,
-                                    onLongPress: () {},
-                                    color: Colors.lightBlue.withOpacity(0.7),
-                                  ),
-                                ],
-                              for (final node in _nodes)
-                                if (node.type == NodeType.sump) ...[
-                                  // Inlet port (Input)
-                                  WaypointHandle(
-                                    position: node.inputPort,
-                                    onPanStart: (d) => _onPortPanStart(node, isInput: true),
-                                    onPanUpdate: _onPortPanUpdate,
-                                    onPanEnd: _onPortPanEnd,
-                                    onLongPress: () {},
-                                    color: Colors.blueGrey.withOpacity(0.7),
-                                  ),
-                                  // Outlet port (Output)
-                                  WaypointHandle(
-                                    position: node.outputPort,
-                                    onPanStart: (d) => _onPortPanStart(node, isInput: false),
-                                    onPanUpdate: _onPortPanUpdate,
-                                    onPanEnd: _onPortPanEnd,
-                                    onLongPress: () {},
-                                    color: Colors.blue.withOpacity(0.7),
-                                  ),
-                                ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.pump) ...[
+                                    // Discharge port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blue.withOpacity(0.7),
+                                    ),
+                                    // Suction port (Input)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightBlue.withOpacity(0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.sump) ...[
+                                    // Inlet port (Input)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blueGrey.withOpacity(0.7),
+                                    ),
+                                    // Outlet port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blue.withOpacity(0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.overheadTank) ...[
+                                    // Inlet port (Input)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blue.withOpacity(0.7),
+                                    ),
+                                    // Outlet port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightBlue.withOpacity(0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.well) ...[
+                                    // Suction port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightBlue.withOpacity(0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.naturalSource) ...[
+                                    // Intake port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightBlue.withOpacity(0.7),
+                                    ),
+                                  ],
                             ],
                           ),
                         ),
@@ -873,6 +1004,9 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
             _toolButton(Icons.settings_input_component, 'Pump', () => _addNode(NodeType.pump)),
             _toolButton(Icons.propane_tank_outlined, 'Tank', () => _addNode(NodeType.tank)),
             _toolButton(Icons.inbox, 'Sump', () => _addNode(NodeType.sump)),
+            _toolButton(Icons.waves, 'Well', () => _addNode(NodeType.well)),
+            _toolButton(Icons.architecture, 'OH Tank', () => _addNode(NodeType.overheadTank)),
+            _toolButton(Icons.landscape, 'Natural Src', () => _addNode(NodeType.naturalSource)),
             _toolButton(Icons.call_split, 'Distribution', () => _addNode(NodeType.distribution)),
             const SizedBox(width: 12),
             const VerticalDivider(width: 1),
@@ -914,7 +1048,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
       child: Text(
         _connectMode
             ? 'Connect mode: tap a node or an existing pipe for the start point, then tap another node or pipe for the end point. Tapping a pipe drops a small junction there and branches your new pipe off it.'
-            : 'Drag any pump/tank to move it • Double-tap a pipe to add a bend point • Drag an orange handle to bend/reshape a pipe • Long-press a handle to remove it • Long-press a node to rename, toggle on/off, or delete • Deleting a 2-way junction reconnects the pipe automatically.',
+            : 'Drag any pump/tank to move it • Double-tap a pipe to add a bend point • Drag an orange handle to bend/reshape a pipe • Long-press a node to edit (toggle joints, rename, etc.) • Use the layer icon in top bar to hide/show all joints.',
         style: const TextStyle(fontSize: 12, color: Colors.black87),
       ),
     );

@@ -10,8 +10,13 @@ import 'package:flutter/material.dart';
 class DetailedPumpPainter extends CustomPainter {
   final bool isOn;
   final double phase;
+  final bool showJoints;
 
-  DetailedPumpPainter({required this.isOn, this.phase = 0});
+  DetailedPumpPainter({
+    required this.isOn,
+    this.phase = 0,
+    this.showJoints = true,
+  });
 
   // ---------------------------------------------------------------- palette
   // Punchier, more saturated than a realistic industrial grey-green so the
@@ -109,7 +114,7 @@ class DetailedPumpPainter extends CustomPainter {
       c,
       w * (0.46 + 0.04 * breathe),
       Paint()
-        ..color = _accentGlowSoft.withOpacity(0.28 * breathe)
+        ..color = _accentGlowSoft.withValues(alpha: 0.28 * breathe)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.09),
     );
   }
@@ -133,15 +138,18 @@ class DetailedPumpPainter extends CustomPainter {
     canvas.drawRect(front, _fill(front, const [_steelDark, Color(0xFF2B3337)]));
     canvas.drawRect(Rect.fromLTRB(w * 0.08, h * 0.885, w * 0.92, h * 0.945), _outline);
 
-    // Slotted hold-down holes.
-    final Paint hole = Paint()..color = const Color(0xFF1B2226);
-    for (final double x in const [0.13, 0.85]) {
-      final RRect slot = RRect.fromRectAndRadius(
-        Rect.fromLTRB(w * x, h * 0.893, w * (x + 0.045), h * 0.907),
-        Radius.circular(h * 0.007),
-      );
-      canvas.drawRRect(slot, hole);
-      canvas.drawRRect(slot.shift(Offset(0, -h * 0.002)), Paint()..color = const Color(0x33FFFFFF)..style = PaintingStyle.stroke..strokeWidth = 0.8);
+    if (showJoints) {
+      // Slotted hold-down holes.
+      final Paint hole = Paint()..color = const Color(0xFF1B2226);
+      for (final double x in const [0.13, 0.85]) {
+        final RRect slot = RRect.fromRectAndRadius(
+          Rect.fromLTRB(w * x, h * 0.893, w * (x + 0.045), h * 0.907),
+          Radius.circular(h * 0.007),
+        );
+        canvas.drawRRect(slot, hole);
+        canvas.drawRRect(slot.shift(Offset(0, -h * 0.002)),
+            Paint()..color = const Color(0x33FFFFFF)..style = PaintingStyle.stroke..strokeWidth = 0.8);
+      }
     }
   }
 
@@ -224,7 +232,9 @@ class DetailedPumpPainter extends CustomPainter {
       RRect.fromRectAndRadius(plate, Radius.circular(h * 0.008)),
       Paint()..style = PaintingStyle.stroke..strokeWidth = 0.9..color = const Color(0xFF39434A),
     );
-    _bolts(canvas, plate.center, plate.width * 0.44, h * 0.007, 4, startAngle: math.pi / 4);
+    if (showJoints) {
+      _bolts(canvas, plate.center, plate.width * 0.44, h * 0.007, 4, startAngle: math.pi / 4);
+    }
 
     // Etched data lines.
     final Paint etch = Paint()..color = const Color(0xFF4A5459)..strokeWidth = 1.0;
@@ -327,7 +337,9 @@ class DetailedPumpPainter extends CustomPainter {
       end: Alignment.bottomRight,
     ).createShader(Rect.fromCircle(center: c, radius: r * 0.22)));
     canvas.drawCircle(c, r, _outline);
-    _bolts(canvas, c, r * 0.92, h * 0.011, 6, startAngle: math.pi / 6);
+    if (showJoints) {
+      _bolts(canvas, c, r * 0.92, h * 0.011, 6, startAngle: math.pi / 6);
+    }
   }
 
   void _terminalBox(Canvas canvas, double w, double h) {
@@ -341,7 +353,9 @@ class DetailedPumpPainter extends CustomPainter {
     canvas.drawLine(Offset(box.left + 2, box.top + box.height * 0.34),
         Offset(box.right - 2, box.top + box.height * 0.34),
         Paint()..color = const Color(0x66000000)..strokeWidth = 1.2);
-    _bolts(canvas, box.center, box.width * 0.40, h * 0.008, 4, startAngle: math.pi / 4);
+    if (showJoints) {
+      _bolts(canvas, box.center, box.width * 0.40, h * 0.008, 4, startAngle: math.pi / 4);
+    }
 
     // Cable gland on the right shoulder.
     final Rect gland = Rect.fromLTRB(w * 0.775, h * 0.195, w * 0.815, h * 0.225);
@@ -376,7 +390,7 @@ class DetailedPumpPainter extends CustomPainter {
   }
 
   Paint _softShadowColour(Color c, double opacity, double sigma) => Paint()
-    ..color = Color.fromRGBO(c.red, c.green, c.blue, opacity)
+    ..color = c.withValues(alpha: opacity)
     ..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma);
 
   void _coupling(Canvas canvas, double w, double h) {
@@ -417,7 +431,9 @@ class DetailedPumpPainter extends CustomPainter {
         stops: const [0.0, 0.5, 1.0],
       ).createShader(Rect.fromCircle(center: c, radius: r * 0.70)));
     canvas.drawCircle(c, r * 0.70, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.0..color = _edge);
-    _bolts(canvas, c, r * 0.85, h * 0.013, 8, startAngle: math.pi / 8);
+    if (showJoints) {
+      _bolts(canvas, c, r * 0.85, h * 0.013, 8, startAngle: math.pi / 8);
+    }
 
     // Centre hub cap.
     canvas.drawCircle(c, r * 0.20, Paint()
@@ -479,7 +495,9 @@ class DetailedPumpPainter extends CustomPainter {
 
     final Rect fl = Rect.fromLTRB(w * 0.075, h * 0.440, w * 0.125, h * 0.610);
     _flange(canvas, fl, h, horizontalPipe: true);
-    _bolts(canvas, fl.center, fl.height * 0.36, h * 0.010, 4, startAngle: math.pi / 4);
+    if (showJoints) {
+      _bolts(canvas, fl.center, fl.height * 0.36, h * 0.010, 4, startAngle: math.pi / 4);
+    }
 
     final Rect throat = Rect.fromLTRB(w * 0.125, h * 0.462, w * 0.20, h * 0.588);
     canvas.drawRect(throat, _fill(throat, [_castLight, _castMid, _castDeep], stops: const [0, 0.3, 1]));
@@ -496,7 +514,9 @@ class DetailedPumpPainter extends CustomPainter {
     // Flange.
     final Rect fl = Rect.fromLTRB(w * 0.160, h * 0.095, w * 0.350, h * 0.135);
     _flange(canvas, fl, h, horizontalPipe: false);
-    _bolts(canvas, fl.center, fl.width * 0.36, h * 0.010, 4, startAngle: math.pi / 4);
+    if (showJoints) {
+      _bolts(canvas, fl.center, fl.width * 0.36, h * 0.010, 4, startAngle: math.pi / 4);
+    }
 
     // Blue riser.
     final Rect riser = Rect.fromLTRB(w * 0.198, h * 0.030, w * 0.312, h * 0.098);
@@ -516,7 +536,7 @@ class DetailedPumpPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = h * 0.028
-        ..color = _accentGlow.withOpacity(0.35 * pulse)
+        ..color = _accentGlow.withValues(alpha: 0.35 * pulse)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.03),
     );
   }
@@ -525,9 +545,9 @@ class DetailedPumpPainter extends CustomPainter {
   /// clear "liquid is flowing" cue that draws the eye — the biggest visual
   /// difference between a static illustration and one that feels alive.
   void _flowDots(Canvas canvas, double w, double h) {
-    final Paint dot = Paint()..color = Colors.white.withOpacity(0.9);
+    final Paint dot = Paint()..color = Colors.white.withValues(alpha: 0.9);
     final Paint dotGlow = Paint()
-      ..color = Colors.white.withOpacity(0.5)
+      ..color = Colors.white.withValues(alpha: 0.5)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.01);
 
     // Discharge riser: dots travel upward.
@@ -550,7 +570,8 @@ class DetailedPumpPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DetailedPumpPainter old) => old.isOn != isOn || old.phase != phase;
+  bool shouldRepaint(covariant DetailedPumpPainter old) =>
+      old.isOn != isOn || old.phase != phase || old.showJoints != showJoints;
 }
 
 /// Drop-in widget: keeps the fan spinning (and the glow breathing/flow dots
@@ -559,9 +580,15 @@ class DetailedPumpPainter extends CustomPainter {
 /// effective way to draw the user's attention to the state change.
 class PumpView extends StatefulWidget {
   final bool isOn;
+  final bool showJoints;
   final Size size;
 
-  const PumpView({super.key, required this.isOn, this.size = const Size(280, 220)});
+  const PumpView({
+    super.key,
+    required this.isOn,
+    this.showJoints = true,
+    this.size = const Size(280, 220),
+  });
 
   @override
   State<PumpView> createState() => _PumpViewState();
@@ -601,7 +628,11 @@ class _PumpViewState extends State<PumpView> with SingleTickerProviderStateMixin
         animation: _c,
         builder: (_, __) => CustomPaint(
           size: widget.size,
-          painter: DetailedPumpPainter(isOn: widget.isOn, phase: _c.value * 2 * math.pi),
+          painter: DetailedPumpPainter(
+            isOn: widget.isOn,
+            phase: _c.value * 2 * math.pi,
+            showJoints: widget.showJoints,
+          ),
         ),
       ),
     );

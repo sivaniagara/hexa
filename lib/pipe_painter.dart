@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'models.dart';
 
@@ -66,10 +65,6 @@ class PipePainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
-
-      if (pipe.flowActive) {
-        _drawArrowsAlong(canvas, points);
-      }
     }
 
     // Rubber-band preview line while user is picking the target node in connect mode.
@@ -87,32 +82,6 @@ class PipePainter extends CustomPainter {
         }
       }
     }
-  }
-
-  void _drawArrowsAlong(Canvas canvas, List<Offset> points) {
-    final paint = Paint()..color = const Color(0xFF1565C0);
-    for (int i = 0; i < points.length - 1; i++) {
-      final a = points[i];
-      final b = points[i + 1];
-      final segLen = (b - a).distance;
-      if (segLen < 24) continue; // skip tiny segments
-      final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
-      final angle = atan2(b.dy - a.dy, b.dx - a.dx);
-      _arrowHead(canvas, mid, angle, paint);
-    }
-  }
-
-  void _arrowHead(Canvas canvas, Offset tip, double angle, Paint paint) {
-    canvas.save();
-    canvas.translate(tip.dx, tip.dy);
-    canvas.rotate(angle);
-    final tri = Path()
-      ..moveTo(7, 0)
-      ..lineTo(-5, -5)
-      ..lineTo(-5, 5)
-      ..close();
-    canvas.drawPath(tri, paint);
-    canvas.restore();
   }
 
   @override

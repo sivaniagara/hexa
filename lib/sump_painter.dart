@@ -15,8 +15,13 @@ import 'package:flutter/material.dart';
 class DetailedSumpPainter extends CustomPainter {
   final bool isOn;
   final double phase;
+  final bool showJoints;
 
-  DetailedSumpPainter({required this.isOn, this.phase = 0});
+  DetailedSumpPainter({
+    required this.isOn,
+    this.phase = 0,
+    this.showJoints = true,
+  });
 
   // ---------------------------------------------------------------- palette
   static const Color _sandLight = Color(0xFFF2D2A9); // Light desert sand
@@ -430,6 +435,7 @@ class DetailedSumpPainter extends CustomPainter {
     final Rect flange = Rect.fromLTWH(w * 0.11, h * 0.27, w * 0.1, h * 0.03);
     canvas.drawRect(flange, _fill(flange, const [_steelLight, _steelMid, _steelDark]));
     canvas.drawRect(flange, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _steelDark);
+    if (showJoints) _flangeBolts(canvas, flange);
 
     // Pouring stream, with motion-streaked edges instead of a flat block.
     if (isOn) {
@@ -475,7 +481,7 @@ class DetailedSumpPainter extends CustomPainter {
     final Rect upperFlange = Rect.fromLTWH(w * 0.73, h * 0.1, w * 0.12, h * 0.04);
     canvas.drawRect(upperFlange, _fill(upperFlange, const [_steelLight, _steelMid, _steelDark]));
     canvas.drawRect(upperFlange, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _steelDark);
-    _flangeBolts(canvas, upperFlange);
+    if (showJoints) _flangeBolts(canvas, upperFlange);
 
     // Foot-valve body at the bottom, sitting just clear of the floor.
     final Rect valveBody = Rect.fromLTWH(w * 0.715, h * 0.70, w * 0.15, h * 0.16);
@@ -550,15 +556,21 @@ class DetailedSumpPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DetailedSumpPainter old) =>
-      old.isOn != isOn || old.phase != phase;
+      old.isOn != isOn || old.phase != phase || old.showJoints != showJoints;
 }
 
 /// Drop-in widget: keeps ripples, bubbles and flow cues animating.
 class SumpView extends StatefulWidget {
   final bool isOn;
+  final bool showJoints;
   final Size size;
 
-  const SumpView({super.key, required this.isOn, this.size = const Size(220, 180)});
+  const SumpView({
+    super.key,
+    required this.isOn,
+    this.showJoints = true,
+    this.size = const Size(220, 180),
+  });
 
   @override
   State<SumpView> createState() => _SumpViewState();
@@ -586,7 +598,11 @@ class _SumpViewState extends State<SumpView> with SingleTickerProviderStateMixin
       animation: _c,
       builder: (_, __) => CustomPaint(
         size: widget.size,
-        painter: DetailedSumpPainter(isOn: widget.isOn, phase: _c.value),
+        painter: DetailedSumpPainter(
+          isOn: widget.isOn,
+          phase: _c.value,
+          showJoints: widget.showJoints,
+        ),
       ),
     );
   }

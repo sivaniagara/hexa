@@ -3,7 +3,17 @@ import 'package:flutter/material.dart';
 /// Type of equipment a node represents on the canvas.
 /// [junction] is a small pass-through point created when a new pipe is
 /// branched off an *existing* pipe (a "T" joint) rather than off a node.
-enum NodeType { source, pump, tank, sump, distribution, junction }
+enum NodeType {
+  source,
+  pump,
+  tank,
+  sump,
+  distribution,
+  junction,
+  well,
+  overheadTank,
+  naturalSource
+}
 
 /// A draggable piece of equipment on the canvas (pump, tank, source, etc).
 class PumpNode {
@@ -13,6 +23,7 @@ class PumpNode {
   NodeType type;
   String label;
   bool isOn; // relevant for pumps (running / stopped)
+  bool showJoints; // toggle visibility of flange bolts and machine joints
 
   PumpNode({
     required this.id,
@@ -21,6 +32,7 @@ class PumpNode {
     required this.type,
     required this.label,
     this.isOn = true,
+    this.showJoints = true,
   });
 
   /// Connection point where pipes coming INTO this node should attach.
@@ -31,6 +43,9 @@ class PumpNode {
     }
     if (type == NodeType.sump) {
       return Offset(position.dx, position.dy + size.height * 0.2);
+    }
+    if (type == NodeType.overheadTank) {
+      return Offset(position.dx + size.width * 0.1, position.dy);
     }
     return Offset(position.dx, position.dy + size.height / 2);
   }
@@ -43,6 +58,15 @@ class PumpNode {
     }
     if (type == NodeType.sump) {
       return Offset(position.dx + size.width * 0.79, position.dy);
+    }
+    if (type == NodeType.well) {
+      return Offset(position.dx + size.width * 0.595, position.dy);
+    }
+    if (type == NodeType.naturalSource) {
+      return Offset(position.dx + size.width * 0.69, position.dy);
+    }
+    if (type == NodeType.overheadTank) {
+      return Offset(position.dx + size.width * 0.5, position.dy + size.height * 0.95);
     }
     return Offset(position.dx + size.width, position.dy + size.height / 2);
   }
@@ -57,6 +81,16 @@ class PumpNode {
     if (type == NodeType.sump) {
       if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
       if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.overheadTank) {
+      if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
+      if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.well) {
+      if (portId == 'suction' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.naturalSource) {
+      if (portId == 'intake' || (portId == null && !isInput)) return outputPort;
     }
     return isInput ? inputPort : outputPort;
   }
@@ -73,6 +107,7 @@ class PumpNode {
         'type': type.name,
         'label': label,
         'isOn': isOn,
+        'showJoints': showJoints,
       };
 
   factory PumpNode.fromJson(Map<String, dynamic> j) => PumpNode(
@@ -82,6 +117,7 @@ class PumpNode {
         type: NodeType.values.byName(j['type'] as String),
         label: j['label'] as String,
         isOn: j['isOn'] as bool? ?? true,
+        showJoints: j['showJoints'] as bool? ?? true,
       );
 }
 
