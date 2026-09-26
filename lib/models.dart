@@ -15,6 +15,7 @@ enum NodeType {
   naturalSource,
   mainFertilizerSource,
   fertilizerTank,
+  multiInjector,
 }
 
 /// A draggable piece of equipment on the canvas (pump, tank, source, etc).
@@ -55,6 +56,9 @@ class PumpNode {
     if (type == NodeType.fertilizerTank) {
       return Offset(position.dx + size.width * 0.12, position.dy + size.height * 0.35);
     }
+    if (type == NodeType.multiInjector) {
+      return Offset(position.dx + size.width * 0.05, position.dy + size.height * 0.54);
+    }
     return Offset(position.dx, position.dy + size.height / 2);
   }
 
@@ -81,6 +85,9 @@ class PumpNode {
     }
     if (type == NodeType.fertilizerTank) {
       return Offset(position.dx + size.width * 0.88, position.dy + size.height * 0.75);
+    }
+    if (type == NodeType.multiInjector) {
+      return Offset(position.dx + size.width * 0.94, position.dy + size.height * 0.72);
     }
     return Offset(position.dx + size.width, position.dy + size.height / 2);
   }
@@ -114,11 +121,45 @@ class PumpNode {
       if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
       if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
     }
+    if (type == NodeType.multiInjector) {
+      if (portId != null && portId.startsWith('channel_')) {
+        final int index = int.tryParse(portId.split('_').last) ?? 0;
+        final double rx = size.width * (0.32 + index * 0.115);
+        return Offset(position.dx + rx, position.dy + size.height * 0.34);
+      }
+      if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
+      if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
+    }
     return isInput ? inputPort : outputPort;
   }
 
   Offset get center =>
       Offset(position.dx + size.width / 2, position.dy + size.height / 2);
+
+  /// Returns default size based on node type.
+  Size get defaultSize {
+    switch (type) {
+      case NodeType.mainFertilizerSource:
+        return const Size(140, 100);
+      case NodeType.fertilizerTank:
+        return const Size(100, 120);
+      case NodeType.multiInjector:
+        return const Size(210, 145);
+      case NodeType.tank:
+      case NodeType.overheadTank:
+        return const Size(110, 130);
+      case NodeType.sump:
+      case NodeType.naturalSource:
+      case NodeType.well:
+        return const Size(130, 90);
+      case NodeType.junction:
+        return const Size(14, 14);
+      case NodeType.pump:
+      case NodeType.source:
+      case NodeType.distribution:
+        return const Size(96, 74);
+    }
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

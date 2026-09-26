@@ -6,6 +6,7 @@ class PipePainter extends CustomPainter {
   final List<PipeConnection> pipes;
   final String? selectedPipeId;
   final String? pendingConnectFromId;
+  final String? pendingFromPortId;
   final Offset? pendingDragPos;
   final bool pendingIsInput;
 
@@ -14,6 +15,7 @@ class PipePainter extends CustomPainter {
     required this.pipes,
     this.selectedPipeId,
     this.pendingConnectFromId,
+    this.pendingFromPortId,
     this.pendingDragPos,
     this.pendingIsInput = false,
   });
@@ -75,7 +77,7 @@ class PipePainter extends CustomPainter {
           ..color = Colors.orange
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3;
-        final startPos = pendingIsInput ? from.inputPort : from.outputPort;
+        final startPos = from.getPort(pendingFromPortId, isInput: pendingIsInput);
         canvas.drawCircle(startPos, 6, dashPaint);
         if (pendingDragPos != null) {
           canvas.drawLine(startPos, pendingDragPos!, dashPaint);

@@ -7,6 +7,7 @@ import 'over_head_tank_painter.dart';
 import 'natural_source_painter.dart';
 import 'main_fertilizer_source_painter.dart';
 import 'fertilizer_tank_painter.dart';
+import 'multi_injector_painter.dart';
 
 class NodeWidget extends StatelessWidget {
   final PumpNode node;
@@ -16,6 +17,8 @@ class NodeWidget extends StatelessWidget {
   final VoidCallback onLongPress;
   final void Function(DragUpdateDetails) onPanUpdate;
   final void Function(DragStartDetails)? onPanStart;
+  final void Function(DragUpdateDetails)? onResizeUpdate;
+  final void Function(DragStartDetails)? onResizeStart;
 
   const NodeWidget({
     super.key,
@@ -24,6 +27,8 @@ class NodeWidget extends StatelessWidget {
     required this.onLongPress,
     required this.onPanUpdate,
     this.onPanStart,
+    this.onResizeUpdate,
+    this.onResizeStart,
     this.isSelected = false,
     this.isConnectSource = false,
   });
@@ -49,6 +54,8 @@ class NodeWidget extends StatelessWidget {
         return Icons.call_split;
       case NodeType.junction:
         return Icons.circle;
+      case NodeType.multiInjector:
+        return Icons.tune;
     }
   }
 
@@ -73,7 +80,76 @@ class NodeWidget extends StatelessWidget {
         return const Color(0xFF6A1B9A);
       case NodeType.junction:
         return const Color(0xFF455A64);
+      case NodeType.multiInjector:
+        return const Color(0xFF1976D2);
     }
+  }
+
+  Widget _buildWrapper({
+    required Widget child,
+    BoxDecoration? decoration,
+    EdgeInsetsGeometry? padding,
+  }) {
+    return Positioned(
+      left: node.position.dx,
+      top: node.position.dy,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            onLongPress: onLongPress,
+            onPanStart: onPanStart,
+            onPanUpdate: onPanUpdate,
+            child: Container(
+              width: node.size.width,
+              height: node.size.height,
+              padding: padding ?? const EdgeInsets.all(4),
+              decoration: decoration ??
+                  BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isSelected || isConnectSource
+                        ? Border.all(
+                            color: isConnectSource ? Colors.orange : Colors.blue,
+                            width: 2,
+                          )
+                        : null,
+                  ),
+              child: child,
+            ),
+          ),
+          if (isSelected && onResizeUpdate != null && node.type != NodeType.junction)
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: onResizeStart,
+                onPanUpdate: onResizeUpdate,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black38, blurRadius: 3),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.open_in_full,
+                    size: 11,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -116,285 +192,115 @@ class NodeWidget extends StatelessWidget {
     }
 
     if (node.type == NodeType.pump) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: CustomPaint(
-              painter: DetailedPumpPainter(
-                isOn: node.isOn,
-                showJoints: node.showJoints,
-              ),
-            ),
+      return _buildWrapper(
+        child: CustomPaint(
+          painter: DetailedPumpPainter(
+            isOn: node.isOn,
+            showJoints: node.showJoints,
           ),
         ),
       );
     }
 
     if (node.type == NodeType.sump) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: SumpView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: SumpView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
     if (node.type == NodeType.well) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: WellView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: WellView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
     if (node.type == NodeType.overheadTank) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: OverheadTankView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: OverheadTankView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
     if (node.type == NodeType.naturalSource) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: NaturalSourceView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: NaturalSourceView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
     if (node.type == NodeType.mainFertilizerSource) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: MainFertilizerSourceView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: MainFertilizerSourceView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
     if (node.type == NodeType.fertilizerTank) {
-      return Positioned(
-        left: node.position.dx,
-        top: node.position.dy,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: onPanStart,
-          onPanUpdate: onPanUpdate,
-          child: Container(
-            width: node.size.width,
-            height: node.size.height,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected || isConnectSource
-                  ? Border.all(
-                      color: isConnectSource ? Colors.orange : Colors.blue,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            padding: const EdgeInsets.all(4),
-            child: FertilizerTankView(
-              isOn: node.isOn,
-              showJoints: node.showJoints,
-              size: node.size,
-            ),
-          ),
+      return _buildWrapper(
+        child: FertilizerTankView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
       );
     }
 
-    return Positioned(
-      left: node.position.dx,
-      top: node.position.dy,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        onLongPress: onLongPress,
-        onPanStart: onPanStart,
-        onPanUpdate: onPanUpdate,
-        child: Container(
-          width: node.size.width,
-          height: node.size.height,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: borderColor,
-              width: isSelected || isConnectSource ? 3 : 1.5,
-            ),
-            boxShadow: const [
-              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_icon, color: _iconColor, size: 26),
-              const SizedBox(height: 3),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  node.label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+    if (node.type == NodeType.multiInjector) {
+      return _buildWrapper(
+        child: MultiInjectorView(
+          isOn: node.isOn,
+          showJoints: node.showJoints,
+          size: node.size,
         ),
+      );
+    }
+
+    return _buildWrapper(
+      padding: EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: borderColor,
+          width: isSelected || isConnectSource ? 3 : 1.5,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(_icon, color: _iconColor, size: 26),
+          const SizedBox(height: 3),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              node.label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -26,6 +26,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
   String? _selectedPipeId;
   bool _connectMode = false;
   String? _connectFromId;
+  String? _connectFromPortId;
   Offset? _pendingDragConnectionPos;
   bool _pendingDragIsInput = false;
   double _scale = 1.0;
@@ -194,6 +195,8 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
       size = const Size(140, 100);
     } else if (type == NodeType.fertilizerTank) {
       size = const Size(100, 120);
+    } else if (type == NodeType.multiInjector) {
+      size = const Size(160, 110);
     } else if (type == NodeType.tank || type == NodeType.overheadTank) {
       size = const Size(110, 130);
     } else if (type == NodeType.sump || type == NodeType.naturalSource || type == NodeType.well) {
@@ -238,6 +241,8 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         return 'Main Fert Source';
       case NodeType.fertilizerTank:
         return 'Fertilizer Tank';
+      case NodeType.multiInjector:
+        return 'Multi-Injector Skid';
     }
   }
 
@@ -250,6 +255,52 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
           .clamp(0.0, kCanvasHeight - node.size.height)
           .toDouble();
       node.position = Offset(dx, dy);
+    });
+  }
+
+  void _onNodeResizeUpdate(PumpNode node, DragUpdateDetails details) {
+    setState(() {
+      final double deltaX = details.delta.dx / _scale;
+      final double deltaY = details.delta.dy / _scale;
+
+      double maxW = (kCanvasWidth - node.position.dx).clamp(30.0, 800.0);
+      double maxH = (kCanvasHeight - node.position.dy).clamp(30.0, 800.0);
+
+      if (_isShiftPressed && node.size.width > 0) {
+        final double aspectRatio = node.size.width / node.size.height;
+        double newWidth = (node.size.width + deltaX).clamp(30.0, maxW);
+        double newHeight = (newWidth / aspectRatio).clamp(30.0, maxH);
+        newWidth = newHeight * aspectRatio;
+        node.size = Size(newWidth, newHeight);
+      } else {
+        double newWidth = (node.size.width + deltaX).clamp(30.0, maxW);
+        double newHeight = (node.size.height + deltaY).clamp(30.0, maxH);
+        node.size = Size(newWidth, newHeight);
+      }
+    });
+  }
+
+  void _scaleSelectedNode(double factor) {
+    if (_selectedNodeId == null) return;
+    final node = _findNode(_selectedNodeId!);
+    if (node == null || node.type == NodeType.junction) return;
+    _saveToHistory();
+    setState(() {
+      final double maxW = (kCanvasWidth - node.position.dx).clamp(30.0, 800.0);
+      final double maxH = (kCanvasHeight - node.position.dy).clamp(30.0, 800.0);
+      final newW = (node.size.width * factor).clamp(30.0, maxW);
+      final newH = (node.size.height * factor).clamp(30.0, maxH);
+      node.size = Size(newW, newH);
+    });
+  }
+
+  void _resetSelectedNodeSize() {
+    if (_selectedNodeId == null) return;
+    final node = _findNode(_selectedNodeId!);
+    if (node == null) return;
+    _saveToHistory();
+    setState(() {
+      node.size = node.defaultSize;
     });
   }
 
@@ -294,35 +345,58 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
     final controller = TextEditingController(text: node.label);
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: 20 + MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Edit ${node.type.name}', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(labelText: 'Label', border: OutlineInputBorder()),
+        bool lockAspectRatio = true;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            void updateSize(double newW, double newH) {
+              _saveToHistory();
+              setSheetState(() {
+                node.size = Size(
+                  newW.clamp(30.0, 600.0),
+                  newH.clamp(30.0, 600.0),
+                );
+              });
+              setState(() {});
+            }
+
+            void scaleBy(double factor) {
+              updateSize(node.size.width * factor, node.size.height * factor);
+            }
+
+            void resetSize() {
+              final def = node.defaultSize;
+              updateSize(def.width, def.height);
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: 20 + MediaQuery.of(ctx).viewInsets.bottom,
               ),
-              if (node.type == NodeType.pump ||
-                  node.type == NodeType.sump ||
-                  node.type == NodeType.well ||
-                  node.type == NodeType.overheadTank ||
-                  node.type == NodeType.naturalSource ||
-                  node.type == NodeType.mainFertilizerSource ||
-                  node.type == NodeType.fertilizerTank) ...[
-                const SizedBox(height: 8),
-                StatefulBuilder(
-                  builder: (ctx, setSheetState) => Column(
-                    children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Edit ${node.type.name}', style: Theme.of(ctx).textTheme.titleMedium),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      decoration: const InputDecoration(labelText: 'Label', border: OutlineInputBorder()),
+                    ),
+                    if (node.type == NodeType.pump ||
+                        node.type == NodeType.sump ||
+                        node.type == NodeType.well ||
+                        node.type == NodeType.overheadTank ||
+                        node.type == NodeType.naturalSource ||
+                        node.type == NodeType.mainFertilizerSource ||
+                        node.type == NodeType.fertilizerTank ||
+                        node.type == NodeType.multiInjector) ...[
+                      const SizedBox(height: 8),
                       SwitchListTile(
                         title: Text(node.type == NodeType.pump ? 'Pump running' : 'Active / Flowing'),
                         value: node.isOn,
@@ -343,37 +417,161 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                         },
                       ),
                     ],
-                  ),
+                    if (node.type != NodeType.junction) ...[
+                      const Divider(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Node Size (${node.size.width.round()} × ${node.size.height.round()} px)',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Reset', style: TextStyle(fontSize: 12)),
+                            onPressed: resetSize,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Quick Preset Buttons
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => scaleBy(0.9),
+                            child: const Text('-10%'),
+                          ),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => scaleBy(1.1),
+                            child: const Text('+10%'),
+                          ),
+                          ActionChip(
+                            label: const Text('0.75x', style: TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              final def = node.defaultSize;
+                              updateSize(def.width * 0.75, def.height * 0.75);
+                            },
+                          ),
+                          ActionChip(
+                            label: const Text('1.0x', style: TextStyle(fontSize: 11)),
+                            onPressed: resetSize,
+                          ),
+                          ActionChip(
+                            label: const Text('1.25x', style: TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              final def = node.defaultSize;
+                              updateSize(def.width * 1.25, def.height * 1.25);
+                            },
+                          ),
+                          ActionChip(
+                            label: const Text('1.5x', style: TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              final def = node.defaultSize;
+                              updateSize(def.width * 1.5, def.height * 1.5);
+                            },
+                          ),
+                          ActionChip(
+                            label: const Text('2.0x', style: TextStyle(fontSize: 11)),
+                            onPressed: () {
+                              final def = node.defaultSize;
+                              updateSize(def.width * 2.0, def.height * 2.0);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Width & Height Sliders with Lock Aspect Ratio
+                      Row(
+                        children: [
+                          const SizedBox(width: 50, child: Text('Width', style: TextStyle(fontSize: 12))),
+                          Expanded(
+                            child: Slider(
+                              value: node.size.width.clamp(30.0, 500.0),
+                              min: 30,
+                              max: 500,
+                              label: '${node.size.width.round()} px',
+                              onChanged: (val) {
+                                final ratio = node.size.height / node.size.width;
+                                final newH = lockAspectRatio ? val * ratio : node.size.height;
+                                updateSize(val, newH);
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 35, child: Text('${node.size.width.round()}', style: const TextStyle(fontSize: 12))),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const SizedBox(width: 50, child: Text('Height', style: TextStyle(fontSize: 12))),
+                          Expanded(
+                            child: Slider(
+                              value: node.size.height.clamp(30.0, 500.0),
+                              min: 30,
+                              max: 500,
+                              label: '${node.size.height.round()} px',
+                              onChanged: (val) {
+                                final ratio = node.size.width / node.size.height;
+                                final newW = lockAspectRatio ? val * ratio : node.size.width;
+                                updateSize(newW, val);
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 35, child: Text('${node.size.height.round()}', style: const TextStyle(fontSize: 12))),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: lockAspectRatio,
+                            onChanged: (v) => setSheetState(() => lockAspectRatio = v ?? true),
+                          ),
+                          const Text('Lock Aspect Ratio', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _deleteNode(node.id);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              _saveToHistory();
+                              setState(() => node.label = controller.text);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _deleteNode(node.id);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        _saveToHistory();
-                        setState(() => node.label = controller.text);
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ),
-                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -587,12 +785,13 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
     });
   }
 
-  void _onPortPanStart(PumpNode node, {required bool isInput}) {
+  void _onPortPanStart(PumpNode node, {required bool isInput, String? portId, Offset? initialPos}) {
     _saveToHistory();
     setState(() {
       _connectFromId = node.id;
+      _connectFromPortId = portId;
       _pendingDragIsInput = isInput;
-      _pendingDragConnectionPos = isInput ? node.inputPort : node.outputPort;
+      _pendingDragConnectionPos = initialPos ?? (isInput ? node.getPort(portId, isInput: true) : node.getPort(portId, isInput: false));
     });
   }
 
@@ -700,6 +899,31 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         }
       }
 
+      // Check if dropped near a specific port of a multi-injector skid
+      if (node.type == NodeType.multiInjector) {
+        for (int i = 0; i < 5; i++) {
+          final p = Offset(
+            node.position.dx + node.size.width * (0.32 + i * 0.115),
+            node.position.dy + node.size.height * 0.34,
+          );
+          if ((p - pos).distance < 35) {
+            targetNodeId = node.id;
+            targetPortId = 'channel_$i';
+            break;
+          }
+        }
+        if (targetPortId == null) {
+          if ((node.inputPort - pos).distance < 35) {
+            targetNodeId = node.id;
+            targetPortId = 'inlet';
+          } else if ((node.outputPort - pos).distance < 35) {
+            targetNodeId = node.id;
+            targetPortId = 'outlet';
+          }
+        }
+        if (targetNodeId != null) break;
+      }
+
       final rect = Rect.fromLTWH(node.position.dx, node.position.dy, node.size.width, node.size.height);
       if (rect.contains(pos)) {
         targetNodeId = node.id;
@@ -712,9 +936,9 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         final newPipe = PipeConnection(
           id: _nextId('pipe'),
           fromNodeId: _pendingDragIsInput ? targetNodeId! : _connectFromId!,
-          fromPortId: _pendingDragIsInput ? targetPortId : (_pendingDragIsInput ? null : 'output'),
+          fromPortId: _pendingDragIsInput ? targetPortId : _connectFromPortId,
           toNodeId: _pendingDragIsInput ? _connectFromId! : targetNodeId!,
-          toPortId: _pendingDragIsInput ? 'input' : targetPortId,
+          toPortId: _pendingDragIsInput ? _connectFromPortId : targetPortId,
         );
         _pipes.add(newPipe);
       });
@@ -892,6 +1116,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                     pipes: _pipes,
                                     selectedPipeId: _selectedPipeId,
                                     pendingConnectFromId: _connectFromId,
+                                    pendingFromPortId: _connectFromPortId,
                                     pendingDragPos: _pendingDragConnectionPos,
                                     pendingIsInput: _pendingDragIsInput,
                                   ),
@@ -907,6 +1132,8 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                   onLongPress: () => _onNodeLongPress(node),
                                   onPanStart: (d) => _saveToHistory(),
                                   onPanUpdate: (d) => _onNodePanUpdate(node, d),
+                                  onResizeStart: (d) => _saveToHistory(),
+                                  onResizeUpdate: (d) => _onNodeResizeUpdate(node, d),
                                 ),
                               // waypoint drag handles
                               if (!_globalHideJoints)
@@ -932,7 +1159,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.blue.withOpacity(0.7),
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                     // Suction port (Input)
                                     WaypointHandle(
@@ -941,7 +1168,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightBlue.withOpacity(0.7),
+                                      color: Colors.lightBlue.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -954,7 +1181,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.blueGrey.withOpacity(0.7),
+                                      color: Colors.blueGrey.withValues(alpha: 0.7),
                                     ),
                                     // Outlet port (Output)
                                     WaypointHandle(
@@ -963,7 +1190,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.blue.withOpacity(0.7),
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -976,7 +1203,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.blue.withOpacity(0.7),
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                     // Outlet port (Output)
                                     WaypointHandle(
@@ -985,7 +1212,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightBlue.withOpacity(0.7),
+                                      color: Colors.lightBlue.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -998,7 +1225,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightBlue.withOpacity(0.7),
+                                      color: Colors.lightBlue.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -1011,7 +1238,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightBlue.withOpacity(0.7),
+                                      color: Colors.lightBlue.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -1024,7 +1251,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightGreen.withOpacity(0.7),
+                                      color: Colors.lightGreen.withValues(alpha: 0.7),
                                     ),
                                     // Outlet port (Output)
                                     WaypointHandle(
@@ -1033,7 +1260,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.green.withOpacity(0.7),
+                                      color: Colors.green.withValues(alpha: 0.7),
                                     ),
                                   ],
                               if (!_globalHideJoints)
@@ -1046,7 +1273,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.blue.withOpacity(0.7),
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                     // Outlet port (Output)
                                     WaypointHandle(
@@ -1055,7 +1282,50 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       onPanUpdate: _onPortPanUpdate,
                                       onPanEnd: _onPortPanEnd,
                                       onLongPress: () {},
-                                      color: Colors.lightBlue.withOpacity(0.7),
+                                      color: Colors.lightBlue.withValues(alpha: 0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.multiInjector) ...[
+                                    // 5 top channel ports (Inputs)
+                                    for (int i = 0; i < 5; i++)
+                                      WaypointHandle(
+                                        position: Offset(
+                                          node.position.dx + node.size.width * (0.32 + i * 0.115),
+                                          node.position.dy + node.size.height * 0.34,
+                                        ),
+                                        onPanStart: (d) => _onPortPanStart(
+                                          node,
+                                          isInput: true,
+                                          portId: 'channel_$i',
+                                          initialPos: Offset(
+                                            node.position.dx + node.size.width * (0.32 + i * 0.115),
+                                            node.position.dy + node.size.height * 0.34,
+                                          ),
+                                        ),
+                                        onPanUpdate: _onPortPanUpdate,
+                                        onPanEnd: _onPortPanEnd,
+                                        onLongPress: () {},
+                                        color: Colors.lightBlue.withValues(alpha: 0.8),
+                                      ),
+                                    // Inlet port (left)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true, portId: 'inlet'),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blueGrey.withValues(alpha: 0.7),
+                                    ),
+                                    // Outlet port (right)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false, portId: 'outlet'),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                   ],
                             ],
@@ -1091,6 +1361,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
             _toolButton(Icons.landscape, 'Natural Src', () => _addNode(NodeType.naturalSource)),
             _toolButton(Icons.science, 'Main Fert Src', () => _addNode(NodeType.mainFertilizerSource)),
             _toolButton(Icons.biotech, 'Fert Tank', () => _addNode(NodeType.fertilizerTank)),
+            _toolButton(Icons.tune, 'Multi-Injector', () => _addNode(NodeType.multiInjector)),
             _toolButton(Icons.call_split, 'Distribution', () => _addNode(NodeType.distribution)),
             const SizedBox(width: 12),
             const VerticalDivider(width: 1),
@@ -1107,6 +1378,26 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
               label: const Text('Delete selected', style: TextStyle(color: Colors.red)),
               onPressed: (_selectedNodeId != null || _selectedPipeId != null) ? _deleteSelected : null,
             ),
+            if (_selectedNodeId != null) ...[
+              const SizedBox(width: 8),
+              const VerticalDivider(width: 1),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Reduce node size (-10%)',
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: () => _scaleSelectedNode(0.9),
+              ),
+              IconButton(
+                tooltip: 'Increase node size (+10%)',
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () => _scaleSelectedNode(1.1),
+              ),
+              IconButton(
+                tooltip: 'Reset node size',
+                icon: const Icon(Icons.aspect_ratio),
+                onPressed: _resetSelectedNodeSize,
+              ),
+            ],
           ],
         ),
       ),
@@ -1132,7 +1423,7 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
       child: Text(
         _connectMode
             ? 'Connect mode: tap a node or an existing pipe for the start point, then tap another node or pipe for the end point. Tapping a pipe drops a small junction there and branches your new pipe off it.'
-            : 'Drag any pump/tank to move it • Double-tap a pipe to add a bend point • Drag an orange handle to bend/reshape a pipe • Long-press a node to edit (toggle joints, rename, etc.) • Use the layer icon in top bar to hide/show all joints.',
+            : 'Drag any pump/tank to move it • Drag blue corner handle when selected to resize • Double-tap a pipe to add a bend point • Drag orange handle to reshape pipe • Long-press a node to edit size/labels/joints.',
         style: const TextStyle(fontSize: 12, color: Colors.black87),
       ),
     );
@@ -1154,7 +1445,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey.withOpacity(0.15)
+      ..color = Colors.grey.withValues(alpha: 0.15)
       ..strokeWidth = 1;
     const step = 40.0;
     for (double x = 0; x < size.width; x += step) {
