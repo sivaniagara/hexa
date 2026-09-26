@@ -1,16 +1,17 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// A high-fidelity Natural Source painter (river / pond / open water body):
-/// grassy banks on either side, an open water surface with ripples and sun
-/// caustics, reeds, a few lily pads, and a submerged intake strainer on a
-/// pipe rising up out of frame — the pump's suction point in a natural
-/// source, mirroring the sump/well suction riser.
+/// A high-fidelity Natural Source painter — RIVER edition:
+/// rocky, mossy banks on either side, a flowing current with rapids/foam
+/// near the rocks, drifting leaves, wispy reeds, dragonflies overhead, and
+/// a submerged intake strainer on a pipe rising up out of frame — the
+/// pump's suction point in a natural source.
 ///
+/// Same public API as the pond edition, so it is a drop-in replacement:
 /// [isOn]   – true while the pump is drawing water: bubbles and inward-flow
 ///            chevrons animate near the strainer, and the water gets a
 ///            soft "active" glow.
-/// [phase]  – 0..1 looping animation driver (ripples, flow, bubbles, birds).
+/// [phase]  – 0..1 looping animation driver (current, foam, leaves, flight).
 class DetailedNaturalSourcePainter extends CustomPainter {
   final bool isOn;
   final double phase;
@@ -23,22 +24,28 @@ class DetailedNaturalSourcePainter extends CustomPainter {
   });
 
   // ---------------------------------------------------------------- palette
-  static const Color _skyTop = Color(0xFFBFE3F5);
-  static const Color _skyBottom = Color(0xFFE7F5EC);
+  static const Color _skyTop = Color(0xFFCBE8F6);
+  static const Color _skyBottom = Color(0xFFEFF7EA);
 
-  static const Color _grassLight = Color(0xFF9CCB5A);
-  static const Color _grassMid = Color(0xFF6FA83A);
-  static const Color _grassDark = Color(0xFF3F7A24);
-  static const Color _soil = Color(0xFF6D4C29);
+  static const Color _mossLight = Color(0xFF8FB84A);
+  static const Color _mossMid = Color(0xFF5D8F33);
+  static const Color _mossDark = Color(0xFF355A1E);
 
-  static const Color _waterTop = Color(0xCC63C7F2);
-  static const Color _waterMid = Color(0xCC1F8FD1);
-  static const Color _waterDeep = Color(0xE60B4E80);
+  static const Color _rockLight = Color(0xFFB9AFA0);
+  static const Color _rockMid = Color(0xFF8A8072);
+  static const Color _rockDark = Color(0xFF5A5246);
+  static const Color _soil = Color(0xFF5A4128);
+
+  static const Color _waterTop = Color(0xCC79D6E8);
+  static const Color _waterMid = Color(0xCC1E93B8);
+  static const Color _waterDeep = Color(0xE60A4E6E);
   static const Color _waterGlow = Color(0xFF7FE3FF);
+  static const Color _foam = Color(0xFFF3FBFD);
 
   static const Color _reed = Color(0xFF4C7A2E);
   static const Color _reedDark = Color(0xFF2F5A1C);
-  static const Color _lily = Color(0xFF2E7D32);
+  static const Color _leaf = Color(0xFFB5651D);
+  static const Color _leaf2 = Color(0xFFD98C2B);
 
   static const Color _steelLight = Color(0xFFECEFF1);
   static const Color _steelMid = Color(0xFF8FA0A8);
@@ -46,7 +53,7 @@ class DetailedNaturalSourcePainter extends CustomPainter {
 
   static const Color _edge = Color(0xFF262622);
 
-  double _waterTopY(double h) => h * 0.28;
+  double _waterTopY(double h) => h * 0.26;
   double _waterBottomY(double h) => h * 0.95;
 
   @override
@@ -58,10 +65,10 @@ class DetailedNaturalSourcePainter extends CustomPainter {
     _drawBanks(canvas, w, h);
     if (isOn) _activeGlow(canvas, w, h);
     _drawWater(canvas, w, h);
-    _drawLilyPads(canvas, w, h);
+    _drawLeaves(canvas, w, h);
     _drawReeds(canvas, w, h);
     _drawIntakePipe(canvas, w, h);
-    if (isOn) _drawBirds(canvas, w, h);
+    if (isOn) _drawDragonflies(canvas, w, h);
   }
 
   // -------------------------------------------------------------- helpers
@@ -81,21 +88,19 @@ class DetailedNaturalSourcePainter extends CustomPainter {
     final Rect sky = Rect.fromLTWH(0, 0, w, waterTop);
     canvas.drawRect(sky, _fillV(sky, const [_skyTop, _skyBottom]));
 
-    // Soft sun glow, upper corner.
     canvas.drawCircle(
-      Offset(w * 0.78, h * 0.08),
-      w * 0.10,
+      Offset(w * 0.80, h * 0.07),
+      w * 0.09,
       Paint()
         ..color = Colors.white.withOpacity(0.55)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
     );
 
-    // A couple of soft clouds.
     final math.Random cRnd = _seed(3);
     for (int i = 0; i < 3; i++) {
-      final double cx = w * (0.12 + cRnd.nextDouble() * 0.5);
-      final double cy = h * (0.05 + cRnd.nextDouble() * 0.08);
-      _drawCloud(canvas, Offset(cx, cy), w * (0.09 + cRnd.nextDouble() * 0.04));
+      final double cx = w * (0.10 + cRnd.nextDouble() * 0.5);
+      final double cy = h * (0.04 + cRnd.nextDouble() * 0.07);
+      _drawCloud(canvas, Offset(cx, cy), w * (0.08 + cRnd.nextDouble() * 0.04));
     }
   }
 
@@ -106,72 +111,110 @@ class DetailedNaturalSourcePainter extends CustomPainter {
     canvas.drawCircle(center - Offset(size * 0.45, -size * 0.08), size * 0.32, p);
   }
 
-  // ------------------------------------------------------------------ banks
+  // ------------------------------------------------------------ rocky banks
 
   void _drawBanks(Canvas canvas, double w, double h) {
     final double waterTop = _waterTopY(h);
 
-    // Left bank — a grassy slope wedge.
+    // Soil base behind the moss, for depth.
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..lineTo(w * 0.36, 0)
+        ..lineTo(w * 0.12, waterTop + h * 0.10)
+        ..lineTo(0, waterTop + h * 0.02)
+        ..close(),
+      Paint()..color = _soil.withOpacity(0.7),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(w, 0)
+        ..lineTo(w * 0.62, 0)
+        ..lineTo(w * 0.86, waterTop + h * 0.08)
+        ..lineTo(w, waterTop + h * 0.02)
+        ..close(),
+      Paint()..color = _soil.withOpacity(0.7),
+    );
+
+    // Mossy grass slope, left.
     final Path leftBank = Path()
       ..moveTo(0, 0)
       ..lineTo(w * 0.30, 0)
-      ..lineTo(w * 0.10, waterTop + h * 0.05)
+      ..lineTo(w * 0.11, waterTop + h * 0.06)
       ..lineTo(0, waterTop)
       ..close();
-    canvas.drawPath(leftBank, _fillV(leftBank.getBounds(), const [_grassLight, _grassMid, _grassDark]));
-    canvas.drawPath(leftBank, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.0..color = _edge.withOpacity(0.4));
+    canvas.drawPath(leftBank, _fillV(leftBank.getBounds(), const [_mossLight, _mossMid, _mossDark]));
 
-    // Right bank.
+    // Mossy grass slope, right.
     final Path rightBank = Path()
       ..moveTo(w, 0)
-      ..lineTo(w * 0.74, 0)
-      ..lineTo(w * 0.92, waterTop + h * 0.03)
+      ..lineTo(w * 0.70, 0)
+      ..lineTo(w * 0.90, waterTop + h * 0.04)
       ..lineTo(w, waterTop)
       ..close();
-    canvas.drawPath(rightBank, _fillV(rightBank.getBounds(), const [_grassLight, _grassMid, _grassDark]));
-    canvas.drawPath(rightBank, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.0..color = _edge.withOpacity(0.4));
+    canvas.drawPath(rightBank, _fillV(rightBank.getBounds(), const [_mossLight, _mossMid, _mossDark]));
 
-    // Soil edge right where grass meets water.
-    final Paint soilEdge = Paint()..color = _soil.withOpacity(0.6);
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, waterTop - 1)
-        ..lineTo(w * 0.10, waterTop + h * 0.05)
-        ..lineTo(w * 0.10, waterTop + h * 0.055)
-        ..lineTo(0, waterTop + h * 0.005)
-        ..close(),
-      soilEdge,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(w, waterTop - 1)
-        ..lineTo(w * 0.92, waterTop + h * 0.03)
-        ..lineTo(w * 0.92, waterTop + h * 0.035)
-        ..lineTo(w, waterTop + h * 0.005)
-        ..close(),
-      soilEdge,
-    );
+    // Rocks lining the water's edge, both sides.
+    final math.Random rockRnd = _seed(11);
+    _drawRockCluster(canvas, Offset(w * 0.02, waterTop + h * 0.005), w * 0.16, rockRnd);
+    _drawRockCluster(canvas, Offset(w * 0.80, waterTop - h * 0.005), w * 0.20, rockRnd);
 
-    // Grass texture speckle + tufts along both banks.
+    // A few loose boulders poking out of the current itself.
+    _drawBoulder(canvas, Offset(w * 0.46, waterTop + h * 0.10), w * 0.045);
+    _drawBoulder(canvas, Offset(w * 0.53, waterTop + h * 0.16), w * 0.03);
+
+    // Grass tufts along the tops of the banks.
     final math.Random rnd = _seed(17);
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 46; i++) {
       final bool left = i.isEven;
       final double t = rnd.nextDouble();
-      final double bx = left ? w * (0.02 + t * 0.22) : w * (0.76 + t * 0.22);
-      final double by = h * (0.02 + rnd.nextDouble() * (waterTop / h - 0.03));
-      _drawGrassTuft(canvas, Offset(bx, by), 3 + rnd.nextDouble() * 4, rnd);
+      final double bx = left ? w * (0.01 + t * 0.27) : w * (0.72 + t * 0.27);
+      final double by = h * (0.01 + rnd.nextDouble() * (waterTop / h + 0.01));
+      _drawGrassTuft(canvas, Offset(bx, by), 4 + rnd.nextDouble() * 6, rnd);
     }
   }
 
+  void _drawRockCluster(Canvas canvas, Offset origin, double spread, math.Random rnd) {
+    for (int i = 0; i < 6; i++) {
+      final double rx = origin.dx + rnd.nextDouble() * spread;
+      final double ry = origin.dy + (rnd.nextDouble() - 0.5) * spread * 0.35;
+      final double r = spread * (0.10 + rnd.nextDouble() * 0.10);
+      _drawBoulder(canvas, Offset(rx, ry), r);
+    }
+  }
+
+  void _drawBoulder(Canvas canvas, Offset center, double r) {
+    final Rect rect = Rect.fromCenter(center: center, width: r * 2.2, height: r * 1.6);
+    final RRect rr = RRect.fromRectAndRadius(rect, Radius.circular(r * 0.7));
+    canvas.drawRRect(rr, _fillV(rect, const [_rockLight, _rockMid, _rockDark]));
+    canvas.drawRRect(rr, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _rockDark.withOpacity(0.6));
+    // A little moss cap on top.
+    canvas.drawArc(
+      Rect.fromCenter(center: center - Offset(0, r * 0.5), width: r * 1.6, height: r * 0.9),
+      math.pi, math.pi, false,
+      Paint()..style = PaintingStyle.stroke..strokeWidth = r * 0.35..color = _mossMid.withOpacity(0.7),
+    );
+  }
+
   void _drawGrassTuft(Canvas canvas, Offset base, double size, math.Random rnd) {
-    final Paint blade = Paint()
-      ..color = _grassDark.withOpacity(0.8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0
-      ..strokeCap = StrokeCap.round;
-    for (int i = 0; i < 3; i++) {
-      final double lean = (rnd.nextDouble() - 0.5) * size;
-      canvas.drawLine(base, Offset(base.dx + lean, base.dy - size), blade);
+    for (int i = 0; i < 4; i++) {
+      final double height = size * (0.7 + rnd.nextDouble() * 0.8);
+      final double curve = (rnd.nextDouble() - 0.5) * size * 1.5;
+      final double width = 0.6 + rnd.nextDouble() * 1.4;
+
+      final Paint blade = Paint()
+        ..color = Color.lerp(_mossDark, _mossMid, rnd.nextDouble())!.withOpacity(0.9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round;
+
+      final Path path = Path()
+        ..moveTo(base.dx, base.dy)
+        ..quadraticBezierTo(
+            base.dx + curve * 0.3, base.dy - height * 0.6,
+            base.dx + curve, base.dy - height
+        );
+      canvas.drawPath(path, blade);
     }
   }
 
@@ -198,53 +241,65 @@ class DetailedNaturalSourcePainter extends CustomPainter {
 
     canvas.drawRect(waterRect, _fillV(waterRect, const [_waterTop, _waterMid, _waterDeep], stops: const [0.0, 0.4, 1.0]));
 
-    // Sun caustic shafts, angled.
-    final Paint caustic = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
+    // Sun glints, angled — subtler than caustics since current keeps the
+    // surface broken up.
+    final Paint glint = Paint()
+      ..color = Colors.white.withOpacity(0.10)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
     for (int i = 0; i < 5; i++) {
       final double t = (phase + i / 5) % 1.0;
       final double x = waterRect.left + t * waterRect.width;
       final Path shaft = Path()
         ..moveTo(x, waterRect.top)
-        ..lineTo(x + waterRect.width * 0.05, waterRect.top)
-        ..lineTo(x - waterRect.width * 0.09, waterRect.bottom)
+        ..lineTo(x + waterRect.width * 0.04, waterRect.top)
+        ..lineTo(x - waterRect.width * 0.10, waterRect.bottom)
         ..lineTo(x - waterRect.width * 0.14, waterRect.bottom)
         ..close();
-      canvas.drawPath(shaft, caustic);
+      canvas.drawPath(shaft, glint);
     }
 
-    // Layered ripples across the whole surface.
+    // Flowing current: streaked, elongated chevrons drifting continuously
+    // left-to-right (a river's downstream flow), unlike still-pond ripples.
     for (int layer = 0; layer < 4; layer++) {
-      final Paint ripple = Paint()
-        ..color = Colors.white.withOpacity(0.26 - layer * 0.05)
+      final Paint flow = Paint()
+        ..color = Colors.white.withOpacity(0.22 - layer * 0.04)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3 - layer * 0.22;
-      final Path path = Path();
-      final double amp = h * (0.006 + layer * 0.003);
-      final double freq = 2.5 + layer * 1.2;
-      final double speed = phase * 2 * math.pi * (layer.isEven ? 1 : -1);
-      final double yBase = waterRect.top + layer * h * 0.05 + h * 0.02;
-      for (double x = waterRect.left; x <= waterRect.right; x += 3) {
-        final double t = (x - waterRect.left) / waterRect.width;
-        final double y = yBase + amp * math.sin(t * freq * math.pi + speed);
-        if (x == waterRect.left) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
+        ..strokeWidth = 1.4 - layer * 0.2
+        ..strokeCap = StrokeCap.round;
+      final double yBase = waterRect.top + h * (0.06 + layer * 0.16);
+      final double speed = (phase + layer * 0.17) % 1.0;
+      for (int i = 0; i < 4; i++) {
+        final double t = (speed + i / 4) % 1.0;
+        final double startX = waterRect.left - waterRect.width * 0.15 + t * waterRect.width * 1.3;
+        final double len = waterRect.width * (0.10 + layer * 0.015);
+        final Path streak = Path()
+          ..moveTo(startX, yBase)
+          ..quadraticBezierTo(startX + len * 0.5, yBase + h * 0.01, startX + len, yBase - h * 0.005);
+        canvas.drawPath(streak, flow);
       }
-      canvas.drawPath(path, ripple);
     }
 
-    // A few small fish darting near the bottom for character.
-    final math.Random fishRnd = _seed(29);
-    for (int i = 0; i < 3; i++) {
-      final double seedT = fishRnd.nextDouble();
-      final double t = (phase + seedT) % 1.0;
-      final double fy = waterRect.top + waterRect.height * (0.6 + 0.15 * math.sin(seedT * 10));
-      final double fx = waterRect.left + t * waterRect.width;
-      _drawFish(canvas, Offset(fx, fy), 6 + fishRnd.nextDouble() * 3, t > 0.5);
+    // Rapids / whitewater fanning out from the in-current boulders.
+    final Paint foamPaint = Paint()
+      ..color = _foam.withOpacity(0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    final List<Offset> boulderTips = [
+      Offset(w * 0.46, waterRect.top + h * 0.10),
+      Offset(w * 0.53, waterRect.top + h * 0.16),
+    ];
+    for (final Offset b in boulderTips) {
+      for (int i = 0; i < 3; i++) {
+        final double t = (phase + i / 3) % 1.0;
+        final double spread = w * (0.02 + t * 0.05);
+        final double fade = (1 - t);
+        canvas.drawArc(
+          Rect.fromCenter(center: b, width: spread * 2, height: spread * 1.1),
+          math.pi * 0.9, math.pi * 1.1, false,
+          foamPaint..color = _foam.withOpacity(0.5 * fade),
+        );
+      }
     }
 
     if (isOn) {
@@ -269,44 +324,34 @@ class DetailedNaturalSourcePainter extends CustomPainter {
     );
   }
 
-  void _drawFish(Canvas canvas, Offset pos, double size, bool facingRight) {
-    final Paint body = Paint()..color = const Color(0xFFB0742A).withOpacity(0.55);
-    final double dir = facingRight ? 1 : -1;
-    final Path fish = Path()
-      ..moveTo(pos.dx - dir * size, pos.dy)
-      ..quadraticBezierTo(pos.dx, pos.dy - size * 0.35, pos.dx + dir * size, pos.dy)
-      ..quadraticBezierTo(pos.dx, pos.dy + size * 0.35, pos.dx - dir * size, pos.dy)
-      ..close();
-    canvas.drawPath(fish, body);
-    final Path tail = Path()
-      ..moveTo(pos.dx - dir * size, pos.dy)
-      ..lineTo(pos.dx - dir * size * 1.5, pos.dy - size * 0.3)
-      ..lineTo(pos.dx - dir * size * 1.5, pos.dy + size * 0.3)
-      ..close();
-    canvas.drawPath(tail, body);
-  }
+  // -------------------------------------------------------- floating leaves
 
-  // ------------------------------------------------------------- lily pads
-
-  void _drawLilyPads(Canvas canvas, double w, double h) {
+  void _drawLeaves(Canvas canvas, double w, double h) {
     final double waterTop = _waterTopY(h);
-    final List<Offset> pads = [
-      Offset(w * 0.18, waterTop + h * 0.05),
-      Offset(w * 0.26, waterTop + h * 0.09),
-      Offset(w * 0.14, waterTop + h * 0.12),
-    ];
-    for (final Offset p in pads) {
-      final double r = w * 0.035;
-      final Path pad = Path()..addOval(Rect.fromCircle(center: p, radius: r));
-      // Notch cut for the classic lily-pad shape.
-      final Path notch = Path()
-        ..moveTo(p.dx, p.dy)
-        ..lineTo(p.dx + r * 1.1, p.dy - r * 0.35)
-        ..lineTo(p.dx + r * 1.1, p.dy + r * 0.35)
+    final math.Random rnd = _seed(42);
+    // Leaves drift downstream with the current instead of sitting fixed
+    // like lily pads would.
+    for (int i = 0; i < 5; i++) {
+      final double seedT = rnd.nextDouble();
+      final double t = (phase * 0.5 + seedT) % 1.0;
+      final double lx = w * (-0.05 + t * 1.1);
+      final double ly = waterTop + h * (0.05 + 0.09 * math.sin(seedT * 10));
+      final double r = w * (0.015 + rnd.nextDouble() * 0.008);
+      final double rotation = t * 2 * math.pi * 3 + seedT * 5;
+      final Color leafColor = i.isEven ? _leaf : _leaf2;
+
+      canvas.save();
+      canvas.translate(lx, ly);
+      canvas.rotate(rotation);
+      final Path leaf = Path()
+        ..moveTo(0, -r)
+        ..quadraticBezierTo(r, 0, 0, r)
+        ..quadraticBezierTo(-r, 0, 0, -r)
         ..close();
-      final Path finalPad = Path.combine(PathOperation.difference, pad, notch);
-      canvas.drawPath(finalPad, Paint()..color = _lily.withOpacity(0.85));
-      canvas.drawPath(finalPad, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _reedDark.withOpacity(0.6));
+      canvas.drawPath(leaf, Paint()..color = leafColor.withOpacity(0.9));
+      canvas.drawLine(Offset(0, -r * 0.8), Offset(0, r * 0.8),
+          Paint()..color = _reedDark.withOpacity(0.5)..strokeWidth = 0.6);
+      canvas.restore();
     }
   }
 
@@ -315,29 +360,36 @@ class DetailedNaturalSourcePainter extends CustomPainter {
   void _drawReeds(Canvas canvas, double w, double h) {
     final double waterTop = _waterTopY(h);
     final math.Random rnd = _seed(23);
-    final List<double> clusterX = [w * 0.06, w * 0.12, w * 0.90, w * 0.95];
+    final List<double> clusterX = [w * 0.05, w * 0.11, w * 0.91, w * 0.96];
     for (final double cx in clusterX) {
       final int stalks = 4 + rnd.nextInt(3);
       for (int i = 0; i < stalks; i++) {
-        final double baseX = cx + (rnd.nextDouble() - 0.5) * w * 0.03;
+        final double baseX = cx + (rnd.nextDouble() - 0.5) * w * 0.04;
         final double baseY = waterTop + h * (0.01 + rnd.nextDouble() * 0.03);
-        final double stalkH = h * (0.14 + rnd.nextDouble() * 0.08);
-        final double sway = math.sin(phase * 2 * math.pi + i) * w * 0.008;
+        final double stalkH = h * (0.14 + rnd.nextDouble() * 0.09);
+        final double sway = math.sin(phase * 2 * math.pi + i) * w * 0.01;
 
         final Paint stalk = Paint()
           ..color = Color.lerp(_reed, _reedDark, rnd.nextDouble())!
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4
+          ..strokeWidth = 1.6
           ..strokeCap = StrokeCap.round;
+
         final Path path = Path()
           ..moveTo(baseX, baseY)
-          ..quadraticBezierTo(baseX + sway, baseY - stalkH * 0.6, baseX + sway * 1.6, baseY - stalkH);
+          ..quadraticBezierTo(baseX + sway, baseY - stalkH * 0.5, baseX + sway * 1.8, baseY - stalkH);
         canvas.drawPath(path, stalk);
 
-        // Seed head at the tip.
-        canvas.drawOval(
-          Rect.fromCenter(center: Offset(baseX + sway * 1.6, baseY - stalkH - 3), width: 3, height: 8),
-          Paint()..color = const Color(0xFF8D6E3C),
+        final double headX = baseX + sway * 1.8;
+        final double headY = baseY - stalkH;
+        final Rect headRect = Rect.fromCenter(center: Offset(headX, headY - 4), width: 4, height: 12);
+        canvas.drawRRect(
+            RRect.fromRectAndRadius(headRect, const Radius.circular(2)),
+            Paint()..color = const Color(0xFF5D4037)
+        );
+        canvas.drawRRect(
+            RRect.fromRectAndRadius(Rect.fromLTWH(headRect.left + 1, headRect.top + 2, 1.2, 5), const Radius.circular(0.5)),
+            Paint()..color = Colors.white.withOpacity(0.1)
         );
       }
     }
@@ -415,24 +467,27 @@ class DetailedNaturalSourcePainter extends CustomPainter {
     }
   }
 
-  // -------------------------------------------------------------------- birds
+  // ------------------------------------------------------------ dragonflies
 
-  void _drawBirds(Canvas canvas, double w, double h) {
-    final Paint bird = Paint()
+  void _drawDragonflies(Canvas canvas, double w, double h) {
+    final Paint body = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
+      ..strokeWidth = 1.1
       ..strokeCap = StrokeCap.round
-      ..color = _edge.withOpacity(0.5);
+      ..color = _edge.withOpacity(0.55);
     for (int i = 0; i < 2; i++) {
-      final double t = (phase * 0.4 + i / 2) % 1.0;
-      final double bx = w * (0.05 + t * 0.35);
-      final double by = h * (0.05 + i * 0.03);
-      final double flap = math.sin(phase * 10 + i) * 3;
-      final Path m = Path()
-        ..moveTo(bx - 5, by + flap)
-        ..quadraticBezierTo(bx - 2, by - 3, bx, by)
-        ..quadraticBezierTo(bx + 2, by - 3, bx + 5, by + flap);
-      canvas.drawPath(m, bird);
+      final double t = (phase * 0.6 + i / 2) % 1.0;
+      final double bx = w * (0.12 + t * 0.30) + math.sin(phase * 12 + i) * 4;
+      final double by = h * (0.10 + i * 0.05) + math.cos(phase * 9 + i) * 3;
+      final double flap = math.sin(phase * 20 + i) * 3;
+
+      canvas.drawLine(Offset(bx - 4, by), Offset(bx + 4, by), body);
+      final Paint wing = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = Colors.white.withOpacity(0.5);
+      canvas.drawLine(Offset(bx - 1, by), Offset(bx - 4, by - 3 - flap), wing);
+      canvas.drawLine(Offset(bx + 1, by), Offset(bx + 4, by - 3 - flap), wing);
     }
   }
 
@@ -441,7 +496,7 @@ class DetailedNaturalSourcePainter extends CustomPainter {
       old.isOn != isOn || old.phase != phase || old.showJoints != showJoints;
 }
 
-/// Drop-in widget: keeps ripples, bubbles, reeds and flow cues animating.
+/// Drop-in widget: keeps current, foam, leaves, reeds and flow cues animating.
 class NaturalSourceView extends StatefulWidget {
   final bool isOn;
   final bool showJoints;

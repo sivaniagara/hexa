@@ -190,7 +190,11 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
     final rnd = Random();
     final id = _nextId(type.name);
     Size size = const Size(96, 74);
-    if (type == NodeType.tank || type == NodeType.overheadTank) {
+    if (type == NodeType.mainFertilizerSource) {
+      size = const Size(140, 100);
+    } else if (type == NodeType.fertilizerTank) {
+      size = const Size(100, 120);
+    } else if (type == NodeType.tank || type == NodeType.overheadTank) {
       size = const Size(110, 130);
     } else if (type == NodeType.sump || type == NodeType.naturalSource || type == NodeType.well) {
       size = const Size(130, 90);
@@ -230,6 +234,10 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         return 'Overhead Tank';
       case NodeType.naturalSource:
         return 'Natural Source';
+      case NodeType.mainFertilizerSource:
+        return 'Main Fert Source';
+      case NodeType.fertilizerTank:
+        return 'Fertilizer Tank';
     }
   }
 
@@ -308,7 +316,9 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                   node.type == NodeType.sump ||
                   node.type == NodeType.well ||
                   node.type == NodeType.overheadTank ||
-                  node.type == NodeType.naturalSource) ...[
+                  node.type == NodeType.naturalSource ||
+                  node.type == NodeType.mainFertilizerSource ||
+                  node.type == NodeType.fertilizerTank) ...[
                 const SizedBox(height: 8),
                 StatefulBuilder(
                   builder: (ctx, setSheetState) => Column(
@@ -662,6 +672,34 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
         }
       }
 
+      // Check if dropped near a specific port of a main fertilizer source
+      if (node.type == NodeType.mainFertilizerSource) {
+        if ((node.inputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'inlet';
+          break;
+        }
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'outlet';
+          break;
+        }
+      }
+
+      // Check if dropped near a specific port of a fertilizer tank
+      if (node.type == NodeType.fertilizerTank) {
+        if ((node.inputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'inlet';
+          break;
+        }
+        if ((node.outputPort - pos).distance < 20) {
+          targetNodeId = node.id;
+          targetPortId = 'outlet';
+          break;
+        }
+      }
+
       final rect = Rect.fromLTWH(node.position.dx, node.position.dy, node.size.width, node.size.height);
       if (rect.contains(pos)) {
         targetNodeId = node.id;
@@ -976,6 +1014,50 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
                                       color: Colors.lightBlue.withOpacity(0.7),
                                     ),
                                   ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.mainFertilizerSource) ...[
+                                    // Inlet port (Input)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightGreen.withOpacity(0.7),
+                                    ),
+                                    // Outlet port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.green.withOpacity(0.7),
+                                    ),
+                                  ],
+                              if (!_globalHideJoints)
+                                for (final node in _nodes)
+                                  if (node.type == NodeType.fertilizerTank) ...[
+                                    // Inlet port (Input)
+                                    WaypointHandle(
+                                      position: node.inputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: true),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.blue.withOpacity(0.7),
+                                    ),
+                                    // Outlet port (Output)
+                                    WaypointHandle(
+                                      position: node.outputPort,
+                                      onPanStart: (d) => _onPortPanStart(node, isInput: false),
+                                      onPanUpdate: _onPortPanUpdate,
+                                      onPanEnd: _onPortPanEnd,
+                                      onLongPress: () {},
+                                      color: Colors.lightBlue.withOpacity(0.7),
+                                    ),
+                                  ],
                             ],
                           ),
                         ),
@@ -1007,6 +1089,8 @@ class _DrawYourSiteScreenState extends State<DrawYourSiteScreen> {
             _toolButton(Icons.waves, 'Well', () => _addNode(NodeType.well)),
             _toolButton(Icons.architecture, 'OH Tank', () => _addNode(NodeType.overheadTank)),
             _toolButton(Icons.landscape, 'Natural Src', () => _addNode(NodeType.naturalSource)),
+            _toolButton(Icons.science, 'Main Fert Src', () => _addNode(NodeType.mainFertilizerSource)),
+            _toolButton(Icons.biotech, 'Fert Tank', () => _addNode(NodeType.fertilizerTank)),
             _toolButton(Icons.call_split, 'Distribution', () => _addNode(NodeType.distribution)),
             const SizedBox(width: 12),
             const VerticalDivider(width: 1),

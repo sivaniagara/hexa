@@ -5,6 +5,8 @@ import 'sump_painter.dart';
 import 'well_painter.dart';
 import 'over_head_tank_painter.dart';
 import 'natural_source_painter.dart';
+import 'main_fertilizer_source_painter.dart';
+import 'fertilizer_tank_painter.dart';
 
 class NodeWidget extends StatelessWidget {
   final PumpNode node;
@@ -39,6 +41,10 @@ class NodeWidget extends StatelessWidget {
         return Icons.propane_tank_outlined;
       case NodeType.sump:
         return Icons.inbox;
+      case NodeType.mainFertilizerSource:
+        return Icons.science;
+      case NodeType.fertilizerTank:
+        return Icons.biotech;
       case NodeType.distribution:
         return Icons.call_split;
       case NodeType.junction:
@@ -59,6 +65,10 @@ class NodeWidget extends StatelessWidget {
         return const Color(0xFF3949AB);
       case NodeType.sump:
         return const Color(0xFF6D4C41);
+      case NodeType.mainFertilizerSource:
+        return const Color(0xFF2E7D32);
+      case NodeType.fertilizerTank:
+        return const Color(0xFF0288D1);
       case NodeType.distribution:
         return const Color(0xFF6A1B9A);
       case NodeType.junction:
@@ -267,6 +277,74 @@ class NodeWidget extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(4),
             child: NaturalSourceView(
+              isOn: node.isOn,
+              showJoints: node.showJoints,
+              size: node.size,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (node.type == NodeType.mainFertilizerSource) {
+      return Positioned(
+        left: node.position.dx,
+        top: node.position.dy,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          child: Container(
+            width: node.size.width,
+            height: node.size.height,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isSelected || isConnectSource
+                  ? Border.all(
+                      color: isConnectSource ? Colors.orange : Colors.blue,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.all(4),
+            child: MainFertilizerSourceView(
+              isOn: node.isOn,
+              showJoints: node.showJoints,
+              size: node.size,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (node.type == NodeType.fertilizerTank) {
+      return Positioned(
+        left: node.position.dx,
+        top: node.position.dy,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          onPanStart: onPanStart,
+          onPanUpdate: onPanUpdate,
+          child: Container(
+            width: node.size.width,
+            height: node.size.height,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isSelected || isConnectSource
+                  ? Border.all(
+                      color: isConnectSource ? Colors.orange : Colors.blue,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.all(4),
+            child: FertilizerTankView(
               isOn: node.isOn,
               showJoints: node.showJoints,
               size: node.size,

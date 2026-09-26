@@ -12,7 +12,9 @@ enum NodeType {
   junction,
   well,
   overheadTank,
-  naturalSource
+  naturalSource,
+  mainFertilizerSource,
+  fertilizerTank,
 }
 
 /// A draggable piece of equipment on the canvas (pump, tank, source, etc).
@@ -45,7 +47,13 @@ class PumpNode {
       return Offset(position.dx, position.dy + size.height * 0.2);
     }
     if (type == NodeType.overheadTank) {
-      return Offset(position.dx + size.width * 0.1, position.dy);
+      return Offset(position.dx + size.width * 0.14, position.dy + size.height * 0.12);
+    }
+    if (type == NodeType.mainFertilizerSource) {
+      return Offset(position.dx + size.width * 0.15, position.dy + size.height * 0.15);
+    }
+    if (type == NodeType.fertilizerTank) {
+      return Offset(position.dx + size.width * 0.12, position.dy + size.height * 0.35);
     }
     return Offset(position.dx, position.dy + size.height / 2);
   }
@@ -67,6 +75,12 @@ class PumpNode {
     }
     if (type == NodeType.overheadTank) {
       return Offset(position.dx + size.width * 0.5, position.dy + size.height * 0.95);
+    }
+    if (type == NodeType.mainFertilizerSource) {
+      return Offset(position.dx + size.width * 0.85, position.dy + size.height * 0.82);
+    }
+    if (type == NodeType.fertilizerTank) {
+      return Offset(position.dx + size.width * 0.88, position.dy + size.height * 0.75);
     }
     return Offset(position.dx + size.width, position.dy + size.height / 2);
   }
@@ -91,6 +105,14 @@ class PumpNode {
     }
     if (type == NodeType.naturalSource) {
       if (portId == 'intake' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.mainFertilizerSource) {
+      if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
+      if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
+    }
+    if (type == NodeType.fertilizerTank) {
+      if (portId == 'inlet' || (portId == null && isInput)) return inputPort;
+      if (portId == 'outlet' || (portId == null && !isInput)) return outputPort;
     }
     return isInput ? inputPort : outputPort;
   }

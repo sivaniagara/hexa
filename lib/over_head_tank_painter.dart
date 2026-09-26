@@ -26,10 +26,10 @@ class DetailedOverheadTankPainter extends CustomPainter {
   }) : fillLevel = (fillLevel ?? 0.62).clamp(0.03, 0.97);
 
   // ---------------------------------------------------------------- palette
-  static const Color _tankLight = Color(0xFFE3E7EA);
-  static const Color _tankMid = Color(0xFFB9C2C8);
-  static const Color _tankDark = Color(0xFF7C8A92);
-  static const Color _tankBandDark = Color(0xFF5B6A72);
+  static const Color _tankLight = Color(0xFFF0F0F0); // Warm Grey / Concrete
+  static const Color _tankMid = Color(0xFFD6D6D6);
+  static const Color _tankDark = Color(0xFFBDBDBD);
+  static const Color _tankPlatform = Color(0xFFAFAFAF);
 
   static const Color _steelLight = Color(0xFFECEFF1);
   static const Color _steelMid = Color(0xFF8FA0A8);
@@ -47,10 +47,14 @@ class DetailedOverheadTankPainter extends CustomPainter {
   static const Color _pipeMid = Color(0xFF0288D1);
   static const Color _pipeDark = Color(0xFF014B7A);
 
+  static const Color _railingPost = Color(0xFF4E342E);
+  static const Color _railingWire = Color(0xFF90A4AE);
+
   static const Color _edge = Color(0xFF262622);
+  static const Color _cutFrame = Color(0xFF1B1B1B); // Black blocks frame
 
   // Shared geometry.
-  Rect _tankRect(double w, double h) => Rect.fromLTWH(w * 0.16, h * 0.03, w * 0.68, h * 0.40);
+  Rect _tankRect(double w, double h) => Rect.fromLTWH(w * 0.20, h * 0.12, w * 0.60, h * 0.35);
   double _groundY(double h) => h * 0.95;
 
   @override
@@ -62,9 +66,12 @@ class DetailedOverheadTankPainter extends CustomPainter {
     _drawTower(canvas, w, h);
     _drawOutletPipe(canvas, w, h);
     if (isOn) _activeGlow(canvas, w, h);
-    _drawTankShell(canvas, w, h);
-    _drawWaterCutaway(canvas, w, h);
-    _drawTankBandsAndRoof(canvas, w, h);
+
+    // Removed _drawTankShell as the section cut is now full width
+    _drawWaterCutaway(canvas, w, h); // Draw full width interior + black frame
+    _drawTankPlatforms(canvas, w, h); // Lips at top and bottom
+    _drawRailings(canvas, w, h); // Railings at top and bottom
+
     _drawInletPipe(canvas, w, h);
     _drawVentAndLadder(canvas, w, h);
   }
@@ -199,106 +206,131 @@ class DetailedOverheadTankPainter extends CustomPainter {
 
   // ------------------------------------------------------------------ tank
 
-  void _drawTankShell(Canvas canvas, double w, double h) {
-    final Rect tank = _tankRect(w, h);
-    final RRect body = RRect.fromRectAndRadius(tank, Radius.circular(tank.height * 0.5));
-    canvas.drawRRect(body, _fill(tank, const [_tankDark, _tankLight, _tankMid, _tankDark], stops: const [0.0, 0.32, 0.55, 1.0]));
-
-    // Dome cap top ellipse to sell the cylinder.
-    final Rect domeRect = Rect.fromLTWH(tank.left, tank.top - tank.height * 0.10, tank.width, tank.height * 0.22);
-    canvas.drawOval(domeRect, _fillV(domeRect, const [_tankLight, _tankMid]));
-    canvas.drawOval(domeRect, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.0..color = _edge.withOpacity(0.4));
-
-    canvas.drawRRect(body, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.2..color = _edge.withOpacity(0.55));
-
-    // Vertical panel seams.
-    if (showJoints) {
-      final Paint seam = Paint()..color = Colors.black.withOpacity(0.10)..strokeWidth = 1.0;
-      for (final double fx in [0.32, 0.5, 0.68]) {
-        canvas.drawLine(Offset(tank.left + tank.width * fx, tank.top), Offset(tank.left + tank.width * fx, tank.bottom), seam);
-      }
-    }
-  }
+  // Removed _drawTankShell as the section cut is now full width
 
   void _drawWaterCutaway(Canvas canvas, double w, double h) {
     final Rect tank = _tankRect(w, h);
-    // Cutaway window in the tank showing the water level — an inset rounded
-    // rect slightly smaller than the shell so a steel rim remains visible.
-    final Rect window = tank.deflate(tank.height * 0.10);
-    final RRect windowShape = RRect.fromRectAndRadius(window, Radius.circular(window.height * 0.45));
+    final double wallThickness = w * 0.035;
+
+    // 1. Draw the "Black Blocks" frame around the full width
+    final Paint framePaint = Paint()..color = _cutFrame;
+    // Top wall thickness
+    canvas.drawRect(Rect.fromLTWH(tank.left, tank.top, tank.width, wallThickness), framePaint);
+    // Bottom wall thickness
+    canvas.drawRect(Rect.fromLTWH(tank.left, tank.bottom - wallThickness, tank.width, wallThickness), framePaint);
+    // Left side wall thickness
+    canvas.drawRect(Rect.fromLTWH(tank.left, tank.top, wallThickness, tank.height), framePaint);
+    // Right side wall thickness
+    canvas.drawRect(Rect.fromLTWH(tank.right - wallThickness, tank.top, wallThickness, tank.height), framePaint);
+
+    // 2. Draw the interior space
+    final Rect interior = Rect.fromLTRB(
+      tank.left + wallThickness,
+      tank.top + wallThickness,
+      tank.right - wallThickness,
+      tank.bottom - wallThickness
+    );
+    canvas.drawRect(interior, Paint()..color = const Color(0xFF242424)); // Dark interior
+
+    // 3. Draw the water level (Full Width)
+    final double waterHeight = interior.height * fillLevel;
+    final Rect waterRect = Rect.fromLTWH(
+      interior.left,
+      interior.bottom - waterHeight,
+      interior.width,
+      waterHeight
+    );
 
     canvas.save();
-    canvas.clipRRect(windowShape);
+    canvas.clipRect(interior);
+    canvas.drawRect(waterRect, _fillV(waterRect, const [_waterTop, _waterMid, _waterDeep]));
 
-    // Empty-space (air gap) tint above the water.
-    canvas.drawRect(window, Paint()..color = _tankLight.withOpacity(0.5));
-
-    final double waterTopY = window.bottom - window.height * fillLevel;
-    final Rect waterRect = Rect.fromLTRB(window.left, waterTopY, window.right, window.bottom);
-    canvas.drawRect(waterRect, _fillV(waterRect, const [_waterTop, _waterMid, _waterDeep], stops: const [0.0, 0.4, 1.0]));
-
-    // Ripples on the water surface inside the tank.
+    // Ripples and bubbles
     for (int layer = 0; layer < 2; layer++) {
       final Paint ripple = Paint()
-        ..color = Colors.white.withOpacity(0.32 - layer * 0.12)
+        ..color = Colors.white.withOpacity(0.3 - layer * 0.1)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2 - layer * 0.3;
+        ..strokeWidth = 1.0;
       final Path path = Path();
-      final double amp = h * (0.004 + layer * 0.002);
-      final double freq = 4.0 + layer * 1.5;
-      final double speed = phase * 2 * math.pi * (layer.isEven ? 1 : -1);
-      for (double x = waterRect.left; x <= waterRect.right; x += 3) {
+      final double amp = h * 0.003;
+      final double freq = 6.0;
+      final double speed = phase * 2 * math.pi;
+      for (double x = waterRect.left; x <= waterRect.right; x += 2) {
         final double t = (x - waterRect.left) / waterRect.width;
-        final double y = waterTopY + amp * math.sin(t * freq * math.pi + speed);
-        if (x == waterRect.left) {
-          path.moveTo(x, y);
-        } else {
-          path.lineTo(x, y);
-        }
+        final double y = (interior.bottom - waterHeight) + amp * math.sin(t * freq * math.pi + speed);
+        if (x == waterRect.left) path.moveTo(x, y); else path.lineTo(x, y);
       }
       canvas.drawPath(path, ripple);
     }
 
     if (isOn) {
-      final math.Random bubbleRnd = _seed(9);
-      for (int i = 0; i < 7; i++) {
-        final double seedT = bubbleRnd.nextDouble();
+      final math.Random rnd = _seed(12);
+      for (int i = 0; i < 10; i++) {
+        final double seedT = rnd.nextDouble();
         final double t = (phase + seedT) % 1.0;
-        final double bx = waterRect.left + bubbleRnd.nextDouble() * waterRect.width;
+        final double bx = waterRect.left + rnd.nextDouble() * waterRect.width;
         final double by = waterRect.bottom - t * waterRect.height;
-        if (by < waterTopY) continue;
-        final double r = 0.8 + bubbleRnd.nextDouble() * 1.3;
-        final double fade = (1 - t).clamp(0.0, 1.0);
-        canvas.drawCircle(Offset(bx, by), r, Paint()..color = Colors.white.withOpacity(0.5 * fade));
+        canvas.drawCircle(Offset(bx, by), 1.2, Paint()..color = Colors.white.withOpacity(0.4 * (1 - t)));
       }
     }
-
     canvas.restore();
-
-    canvas.drawRRect(windowShape, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.1..color = _edge.withOpacity(0.5));
-    canvas.drawLine(Offset(window.left, waterTopY), Offset(window.right, waterTopY),
-        Paint()..color = Colors.white.withOpacity(0.4)..strokeWidth = 1.0);
   }
 
-  void _drawTankBandsAndRoof(Canvas canvas, double w, double h) {
+  void _drawTankPlatforms(Canvas canvas, double w, double h) {
     final Rect tank = _tankRect(w, h);
+    final double lipH = h * 0.025;
+    final double lipExtend = w * 0.06;
 
-    // Roof cone / cap.
-    final Path roof = Path()
-      ..moveTo(tank.left + tank.width * 0.08, tank.top - tank.height * 0.03)
-      ..lineTo(tank.center.dx, tank.top - tank.height * 0.32)
-      ..lineTo(tank.right - tank.width * 0.08, tank.top - tank.height * 0.03)
-      ..close();
-    canvas.drawPath(roof, _fillV(roof.getBounds(), const [_steelLight, _tankMid]));
-    canvas.drawPath(roof, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.0..color = _edge.withOpacity(0.5));
+    final Paint platformPaint = Paint()..color = _tankPlatform;
+    final Paint shadowPaint = Paint()..color = Colors.black26;
 
-    // Horizontal reinforcing bands around the tank.
-    if (showJoints) {
-      final Paint band = Paint()..color = _tankBandDark.withOpacity(0.7)..strokeWidth = 2.0;
-      for (final double fy in [0.28, 0.62]) {
-        canvas.drawLine(Offset(tank.left, tank.top + tank.height * fy), Offset(tank.right, tank.top + tank.height * fy), band);
+    // Bottom Platform (Walkway)
+    final Rect bottomLip = Rect.fromLTWH(tank.left - lipExtend, tank.bottom - lipH * 0.5, tank.width + lipExtend * 2, lipH);
+    canvas.drawRRect(RRect.fromRectAndRadius(bottomLip, Radius.circular(lipH * 0.4)), platformPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(bottomLip, Radius.circular(lipH * 0.4)), Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _edge.withOpacity(0.4));
+    
+    // Top Platform (Rim)
+    final Rect topLip = Rect.fromLTWH(tank.left - w * 0.02, tank.top - lipH * 0.5, tank.width + w * 0.04, lipH);
+    canvas.drawRRect(RRect.fromRectAndRadius(topLip, Radius.circular(lipH * 0.4)), platformPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(topLip, Radius.circular(lipH * 0.4)), Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _edge.withOpacity(0.4));
+
+    // Shallow dome top
+    final Rect dome = Rect.fromLTWH(tank.left, tank.top - h * 0.04, tank.width, h * 0.08);
+    canvas.drawArc(dome, math.pi, math.pi, false, platformPaint);
+    canvas.drawArc(dome, math.pi, math.pi, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = _edge.withOpacity(0.4));
+  }
+
+  void _drawRailings(Canvas canvas, double w, double h) {
+    final Rect tank = _tankRect(w, h);
+    final double railH = h * 0.06;
+    final double lipExtend = w * 0.06;
+
+    // Helper for railings
+    void drawRailSet(double xStart, double xEnd, double yBase) {
+      final int posts = 6;
+      final double step = (xEnd - xStart) / (posts - 1);
+      
+      final Paint postPaint = Paint()..color = _railingPost..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+      final Paint wirePaint = Paint()..color = _railingWire..strokeWidth = 0.6;
+
+      // Vertical posts
+      for (int i = 0; i < posts; i++) {
+        final double x = xStart + i * step;
+        canvas.drawLine(Offset(x, yBase), Offset(x, yBase - railH), postPaint);
+      }
+      
+      // Horizontal wires (3 tiers)
+      for (int i = 1; i <= 3; i++) {
+        final double ry = yBase - (railH * (i / 3));
+        canvas.drawLine(Offset(xStart, ry), Offset(xEnd, ry), wirePaint);
       }
     }
+
+    // Bottom platform railings (wider)
+    drawRailSet(tank.left - lipExtend + 4, tank.right + lipExtend - 4, tank.bottom - h * 0.01);
+    
+    // Top rim railings
+    drawRailSet(tank.left - w * 0.01, tank.right + w * 0.01, tank.top - h * 0.01);
   }
 
   // ------------------------------------------------------------ inlet pipe
@@ -348,12 +380,12 @@ class DetailedOverheadTankPainter extends CustomPainter {
     final Rect tank = _tankRect(w, h);
 
     // Small roof vent pipe.
-    final Rect vent = Rect.fromLTWH(tank.center.dx + tank.width * 0.14, tank.top - tank.height * 0.26, w * 0.015, h * 0.05);
-    canvas.drawRect(vent, Paint()..color = _steelMid);
-    canvas.drawRect(vent, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.6..color = _steelDark);
+    final Rect vent = Rect.fromLTWH(tank.center.dx + tank.width * 0.14, tank.top - h * 0.08, w * 0.015, h * 0.05);
+    canvas.drawRect(vent, Paint()..color = _railingPost);
+    canvas.drawRect(vent, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.6..color = _edge);
 
     // Simple ladder up one tower leg.
-    final double legX = tank.center.dx + tank.width * 0.42 * 0.55;
+    final double legX = tank.center.dx + tank.width * 0.42 * 0.6;
     final Paint rail = Paint()..color = _steelDark..strokeWidth = 1.2;
     final double topY = tank.bottom;
     final double botY = _groundY(h) - h * 0.045;
